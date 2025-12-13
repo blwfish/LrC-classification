@@ -1,0 +1,179 @@
+"""
+Vision prompts for racing photography analysis.
+
+Prompts are designed to extract structured metadata from racing images,
+optimized for different racing series and use cases.
+"""
+
+# Base racing prompt template
+RACING_BASE_PROMPT = """Analyze this racing photograph and extract the following information.
+Return your answer as JSON with these fields:
+- make: Car manufacturer (e.g., "Porsche", "BMW", "Ferrari")
+- model: Specific model (e.g., "911 GT3", "Cayman GT4", "M4")
+- color: Primary body color
+- class: Racing class if visible (look for class stickers/badges)
+- numbers: Array of car numbers visible (on doors, hood, or windshield)
+{fuzzy_instruction}
+
+Focus on clearly visible information. If something is not visible or uncertain, omit it.
+Only return the JSON, no other text."""
+
+# Porsche-specific prompt with PCA class knowledge
+PORSCHE_RACING_PROMPT = """Analyze this Porsche Club of America (PCA) racing photograph.
+
+Extract information as JSON with these fields:
+- make: Should be "Porsche" (or other if not a Porsche)
+- model: Specific Porsche model. Common models include:
+  * 911 variants: 911, 911 GT3, 911 GT3 RS, 911 GT3 Cup, 911 RSR, 911 Carrera
+  * Cayman variants: Cayman, Cayman S, Cayman GT4, Cayman GT4 RS
+  * Boxster variants: Boxster, Boxster S, Boxster Spyder
+  * 718 variants: 718 Cayman, 718 Boxster, 718 GT4
+  * Classic: 944, 968, 928, 914
+- color: The ACTUAL visible body color of the car. Describe what you see:
+  * Well-known Porsche colors are fine: Guards Red, Racing Yellow, Miami Blue, Shark Blue, Python Green, etc.
+  * Generic colors also fine: Red, Yellow, Blue, Green, White, Black, Orange, Purple, Pink
+  * "GT Silver" is a specific light metallic silver - do NOT use it as a default for any light-colored car
+  * White cars are White, not GT Silver. Light gray cars are Gray, not GT Silver.
+  * Only say "GT Silver" if the car is clearly that distinctive metallic silver color
+- class: ONLY include if you can clearly read a class sticker/text on the windshield or body.
+  Do NOT guess the class based on the car type. Omit this field if not clearly readable.
+  Valid classes: SPB, SPC, SPD, SPE, GT1-GT5, GTC1-GTC6, SP996, SP997, SP991, Stock, Improved
+- numbers: Array of racing numbers visible (typically on doors and/or hood)
+{fuzzy_instruction}
+
+IMPORTANT:
+- Only report what you can clearly SEE in the image
+- Do NOT guess or infer class from car model - only report class if you read it as text
+- For COLOR: Look at the actual paint. White is White, not GT Silver. Only use GT Silver for true metallic silver.
+- Numbers are large and on doors/hood - report all visible car numbers
+- If multiple cars are visible, report all visible numbers
+
+Return ONLY valid JSON, no other text."""
+
+# Fuzzy number detection instructions
+FUZZY_NUMBER_INSTRUCTION = """
+- fuzzy_numbers: Array of possible alternate numbers if you see evidence of
+  modified numbers (duct tape additions, covered digits, ambiguous markings).
+  For example, if you see "173" but the "1" looks like it might be tape over
+  another number, include both "173" and possible alternates like "73" or "273"."""
+
+NO_FUZZY_INSTRUCTION = ""
+
+# General racing prompt (non-Porsche specific)
+GENERAL_RACING_PROMPT = """Analyze this motorsport racing photograph.
+
+Extract information as JSON:
+- make: Car manufacturer
+- model: Specific model if identifiable
+- color: Primary body color
+- class: Racing class if visible
+- numbers: Array of racing numbers visible
+{fuzzy_instruction}
+
+Common racing series class systems vary widely. Look for:
+- Class stickers on windshield or body
+- Series-specific livery or badges
+- Number boards or door panels
+
+Return ONLY valid JSON, no other text."""
+
+# College sports prompt (placeholder for future)
+COLLEGE_SPORTS_PROMPT = """Analyze this college sports photograph.
+
+Extract information as JSON:
+- sport: The sport being played
+- team: Team name if visible (on jerseys, field, etc.)
+- colors: Team colors visible
+- numbers: Jersey numbers visible
+- action: Brief description of the action
+
+Return ONLY valid JSON, no other text."""
+
+
+def get_prompt(profile: str, fuzzy_numbers: bool = False) -> str:
+    """
+    Get the appropriate prompt for a given profile.
+
+    Args:
+        profile: One of 'racing-porsche', 'racing-general', 'college-sports'
+        fuzzy_numbers: Whether to include fuzzy number detection instructions
+
+    Returns:
+        Formatted prompt string
+    """
+    fuzzy_instruction = FUZZY_NUMBER_INSTRUCTION if fuzzy_numbers else NO_FUZZY_INSTRUCTION
+
+    prompts = {
+        'racing-porsche': PORSCHE_RACING_PROMPT,
+        'racing-general': GENERAL_RACING_PROMPT,
+        'college-sports': COLLEGE_SPORTS_PROMPT,
+    }
+
+    template = prompts.get(profile, PORSCHE_RACING_PROMPT)
+    return template.format(fuzzy_instruction=fuzzy_instruction)
+
+
+def get_available_profiles() -> list[str]:
+    """Return list of available prompt profiles."""
+    return ['racing-porsche', 'racing-general', 'college-sports']
+
+
+# Additional specialized prompts for edge cases
+
+NUMBER_FOCUS_PROMPT = """Focus ONLY on the racing numbers in this image.
+
+Look for numbers on:
+- Door panels (most common location)
+- Hood/bonnet
+- Rear bumper or deck
+- Windshield (less common)
+- Roof (for aerial shots)
+
+Return JSON with:
+- numbers: Array of all visible racing numbers
+- locations: Where each number appears (door, hood, etc.)
+- confidence: "high", "medium", or "low" for each number
+
+Numbers may be:
+- Standard vinyl/painted numbers
+- Duct tape modifications (look for irregular edges)
+- Magnetic number panels
+- LED/digital displays (rare)
+
+Return ONLY valid JSON."""
+
+
+MODEL_FOCUS_PROMPT = """Focus ONLY on identifying the car make and model in this image.
+
+For Porsche identification, look for:
+- Overall body shape (911 vs Cayman vs Boxster silhouettes)
+- Rear engine deck and tail lights
+- Front fascia and headlight shape
+- Model badges (usually on rear deck lid)
+- Wheel designs (often model-specific)
+- Generation indicators (991 vs 992, 981 vs 982)
+
+Return JSON with:
+- make: Manufacturer
+- model: Specific model
+- generation: Generation/year range if identifiable
+- confidence: "high", "medium", or "low"
+
+Return ONLY valid JSON."""
+
+
+def get_specialized_prompt(task: str) -> str:
+    """
+    Get a specialized prompt for a specific task.
+
+    Args:
+        task: One of 'number', 'model'
+
+    Returns:
+        Specialized prompt string
+    """
+    prompts = {
+        'number': NUMBER_FOCUS_PROMPT,
+        'model': MODEL_FOCUS_PROMPT,
+    }
+    return prompts.get(task, PORSCHE_RACING_PROMPT)
