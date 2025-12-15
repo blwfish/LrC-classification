@@ -108,6 +108,50 @@ class LlamaVisionInference:
             logger.error(f"Failed to list models: {e}")
             return None
 
+    def warm_up(self) -> bool:
+        """
+        Pre-load the model into GPU memory for faster inference.
+
+        This sends a minimal request to load the model without processing
+        a real image. Subsequent requests will be ~4-8x faster since the
+        model is already in memory.
+
+        Returns:
+            True if warm-up succeeded, False otherwise
+        """
+        model = self.get_available_model()
+        if not model:
+            return False
+
+        logger.info(f"Warming up model {model}...")
+
+        try:
+            # Send minimal request to load model
+            payload = {
+                'model': model,
+                'prompt': 'Hi',
+                'stream': False,
+                'keep_alive': '30m',
+            }
+
+            data = json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(
+                f"{self.server_url}/api/generate",
+                data=data,
+                headers={'Content-Type': 'application/json'},
+                method='POST'
+            )
+
+            with urllib.request.urlopen(req, timeout=120) as response:
+                _ = response.read()
+
+            logger.info(f"Model {model} loaded and ready")
+            return True
+
+        except Exception as e:
+            logger.warning(f"Warm-up failed: {e}")
+            return False
+
     def ensure_model_available(self) -> bool:
         """Ensure a vision model is available, pulling if necessary."""
         model = self.get_available_model()
@@ -387,6 +431,7 @@ class LlamaVisionInference:
             'prompt': prompt,
             'images': [image_data],
             'stream': False,
+            'keep_alive': '30m',  # Keep model loaded for 30 min (faster subsequent requests)
             'options': {
                 'temperature': 0.1,  # Low temperature for consistent outputs
                 'num_predict': 500,  # Limit response length
