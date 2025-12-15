@@ -131,21 +131,23 @@ After importing XMP sidecars, search in Lightroom using:
 
 ## Processing Speed
 
-Tested with qwen2.5vl:7b (recommended model):
+### Model Comparison (M4 Max, 128GB)
 
-| Hardware | Acceleration | Time/Image | Notes |
-|----------|--------------|------------|-------|
-| M4 Max | Metal GPU | ~6s | 85% GPU utilization, minimal system impact |
-| RTX 4090 | CUDA | ~2-3s | Estimated |
+| Model | Size | Speed (cached) | Memory | Recommendation |
+|-------|------|----------------|--------|----------------|
+| qwen2.5vl:7b | 6GB | ~5.5s/img | ~8GB | **Best choice** - fast, accurate, low memory |
+| qwen2.5vl:32b | 21GB | ~15.5s/img | ~24GB | No quality improvement over 7b |
+| qwen2.5vl:72b | 48GB | ~31s/img | ~51GB | Slower, different but not better results |
 
-**Benchmark Results (7,509 images):**
-- Success rate: 99.97% (2 failures due to HTTP 500)
-- Average time: ~6 seconds/image on M4 Max with Metal
-- Total runtime: ~12 hours
+**Note:** First image after model load incurs a cold-start penalty (~6s for 7b, ~17s for 32b, ~50s for 72b). Subsequent images benefit from model caching via `keep_alive: 30m`.
 
-For large back catalogs:
-- 10K images @ 6s/img ≈ 17 hours (M4 Max)
-- 100K images @ 6s/img ≈ 7 days (M4 Max)
+### Estimated Processing Times
+
+| Dataset Size | Time (7b, cached) |
+|--------------|-------------------|
+| 100 images | ~9 min |
+| 1,000 images | ~1.5 hours |
+| 10,000 images | ~15 hours |
 
 Run in background with `--resume` for interruption tolerance.
 
