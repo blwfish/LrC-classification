@@ -290,6 +290,7 @@ def fix_truncated_json(json_str: str) -> str:
 def parse_model_response(response: str) -> dict:
     """Parse the model's response into structured metadata."""
     metadata = {
+        'car_detected': True,  # Assume true for backwards compatibility
         'make': None,
         'model': None,
         'color': None,
@@ -320,6 +321,14 @@ def parse_model_response(response: str) -> dict:
                 logger.debug(f"Fixed JSON leading zeros in model response")
             data = json.loads(json_str)
 
+            # Check if car was detected
+            car_detected = data.get('car_detected', True)
+            if car_detected is False or str(car_detected).lower() == 'false':
+                metadata['car_detected'] = False
+                # Return early with no car data
+                return metadata
+
+            metadata['car_detected'] = True
             metadata['make'] = data.get('make')
             metadata['model'] = data.get('model')
             metadata['color'] = data.get('color')
@@ -436,9 +445,17 @@ def process_single_image(
 
         # Parse response
         metadata = parse_model_response(response)
+        result['metadata'] = metadata
+        result['car_detected'] = metadata.get('car_detected', True)
+
+        # Only generate keywords if a car was detected
+        if not metadata.get('car_detected', True):
+            result['keywords'] = []
+            result['success'] = True
+            return result
+
         keywords = metadata_to_keywords(metadata, fuzzy_numbers=fuzzy_numbers)
         result['keywords'] = keywords
-        result['metadata'] = metadata
 
         if not dry_run and keywords:
             # Determine where to write (XMP sidecar for RAW, embed for JPG)
@@ -526,6 +543,7 @@ def main():
     results = []
     processed = 0
     failed = 0
+    no_car_count = 0
 
     logger.info(f"Processing {len(images)} images with profile '{args.profile}'...")
     if args.fuzzy_numbers:
@@ -550,7 +568,13 @@ def main():
         if result['success']:
             processed += 1
             tracker.mark_processed(image_path, result['keywords'])
-            kw_str = ', '.join(result['keywords']) if result['keywords'] else '(no keywords)'
+            if not result.get('car_detected', True):
+                kw_str = '(no car detected)'
+                no_car_count += 1
+            elif result['keywords']:
+                kw_str = ', '.join(result['keywords'])
+            else:
+                kw_str = '(no keywords)'
             logger.info(f"  -> {kw_str} ({result['inference_time']:.1f}s)")
         else:
             failed += 1
@@ -558,7 +582,10 @@ def main():
 
     # Summary
     logger.info("-" * 50)
-    logger.info(f"Processing complete: {processed} successful, {failed} failed")
+    summary_parts = [f"{processed} successful", f"{failed} failed"]
+    if no_car_count > 0:
+        summary_parts.append(f"{no_car_count} no car detected")
+    logger.info(f"Processing complete: {', '.join(summary_parts)}")
 
     if args.dry_run:
         logger.info("DRY RUN complete - no files were modified")

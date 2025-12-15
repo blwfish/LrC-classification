@@ -14,7 +14,7 @@ Automatically extract metadata from racing photography using local vision AI and
 
 - Python 3.10+
 - [Ollama](https://ollama.ai) for local vision model inference
-- A vision model (llava recommended)
+- A vision model (qwen2.5vl:7b recommended)
 
 ### Hardware
 
@@ -42,7 +42,7 @@ Automatically extract metadata from racing photography using local vision AI and
 
 4. Or manually pull a vision model:
    ```bash
-   ollama pull llava:7b
+   ollama pull qwen2.5vl:7b
    ```
 
 ## Usage
@@ -97,8 +97,8 @@ python3 racing_tagger.py /path/to/images --fuzzy-numbers
 # Resume an interrupted run
 python3 racing_tagger.py /path/to/images --resume
 
-# Use a larger model for better accuracy
-python3 racing_tagger.py /path/to/images --model llava:13b
+# Use an alternate model
+python3 racing_tagger.py /path/to/images --model llava:7b
 ```
 
 ## Keyword Format
@@ -124,25 +124,28 @@ After importing XMP sidecars, search in Lightroom using:
 
 ## How It Works
 
-1. **Image Analysis**: Each image is sent to a local LLaVA vision model
+1. **Image Analysis**: Each image is sent to a local vision model (qwen2.5vl recommended)
 2. **Metadata Extraction**: The model identifies car make, model, color, class, and numbers
 3. **XMP Writing**: Extracted metadata is written to XMP sidecar files
 4. **Lightroom Import**: Lightroom reads the XMP sidecars and adds keywords to images
 
 ## Processing Speed
 
-Approximate times per image:
+Tested with qwen2.5vl:7b (recommended model):
 
-| Hardware | Model | Time/Image |
-|----------|-------|------------|
-| M4 Max (CPU) | llava:7b | 30-60s |
-| M4 Max (CPU) | llava:13b | 60-120s |
-| RTX 4090 | llava:7b | 1-3s |
-| RTX 4090 | llava:13b | 3-8s |
+| Hardware | Acceleration | Time/Image | Notes |
+|----------|--------------|------------|-------|
+| M4 Max | Metal GPU | ~6s | 85% GPU utilization, minimal system impact |
+| RTX 4090 | CUDA | ~2-3s | Estimated |
+
+**Benchmark Results (7,509 images):**
+- Success rate: 99.97% (2 failures due to HTTP 500)
+- Average time: ~6 seconds/image on M4 Max with Metal
+- Total runtime: ~12 hours
 
 For large back catalogs:
-- 450K images @ 30s/img ≈ 156 days CPU, ~3 weeks if optimized
-- 2.5M images @ 2s/img ≈ 58 days GPU
+- 10K images @ 6s/img ≈ 17 hours (M4 Max)
+- 100K images @ 6s/img ≈ 7 days (M4 Max)
 
 Run in background with `--resume` for interruption tolerance.
 
@@ -159,13 +162,13 @@ ollama serve
 
 Pull a vision model:
 ```bash
-ollama pull llava:7b
+ollama pull qwen2.5vl:7b
 ```
 
 ### Slow inference
 
-- Use a smaller model: `--model llava:7b`
-- Ensure hardware acceleration is working
+- Use qwen2.5vl:7b (fastest tested model with good accuracy)
+- Ensure hardware acceleration is working (Metal on Mac, CUDA on NVIDIA)
 - Check `ollama ps` to see if model is loaded
 
 ### Keywords not appearing in Lightroom
