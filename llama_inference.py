@@ -405,6 +405,18 @@ class LlamaVisionInference:
             logger.warning(f"Failed to normalize {image_path.name} with sips: {e}")
         return None
 
+    def encode_image(self, image_path: Path) -> str:
+        """
+        Encode image to base64 for API request (public interface for pipelining).
+
+        Args:
+            image_path: Path to the image file
+
+        Returns:
+            Base64-encoded image data
+        """
+        return self._encode_image(image_path)
+
     def analyze_image(self, image_path: Path, prompt: str) -> str:
         """
         Analyze an image using the vision model.
@@ -416,14 +428,28 @@ class LlamaVisionInference:
         Returns:
             The model's text response
         """
+        image_data = self._encode_image(image_path)
+        return self.analyze_encoded_image(image_data, prompt)
+
+    def analyze_encoded_image(self, image_data: str, prompt: str) -> str:
+        """
+        Analyze a pre-encoded image using the vision model.
+
+        This allows for pipelined processing where image encoding happens
+        in parallel with inference on the previous image.
+
+        Args:
+            image_data: Base64-encoded image data
+            prompt: The analysis prompt
+
+        Returns:
+            The model's text response
+        """
         model = self.get_available_model()
         if not model:
             if not self.ensure_model_available():
                 raise RuntimeError("No vision model available")
             model = self.get_available_model()
-
-        # Encode and normalize the image
-        image_data = self._encode_image(image_path)
 
         # Build request
         payload = {

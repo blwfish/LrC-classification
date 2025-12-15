@@ -480,6 +480,59 @@ def process_single_image(
     return result
 
 
+def process_with_encoded_image(
+    image_path: Path,
+    image_data: str,
+    inference: LlamaVisionInference,
+    profile: str,
+    fuzzy_numbers: bool,
+    output_dir: Path,
+    dry_run: bool
+) -> dict:
+    """Process a single image with pre-encoded data (for pipelining)."""
+    result = {
+        'image': str(image_path),
+        'success': False,
+        'keywords': [],
+        'error': None,
+        'inference_time': 0
+    }
+
+    try:
+        prompt = get_prompt(profile, fuzzy_numbers=fuzzy_numbers)
+
+        # Run inference with pre-encoded image
+        start_time = datetime.now()
+        response = inference.analyze_encoded_image(image_data, prompt)
+        result['inference_time'] = (datetime.now() - start_time).total_seconds()
+
+        # Parse response
+        metadata = parse_model_response(response)
+        result['metadata'] = metadata
+        result['car_detected'] = metadata.get('car_detected', True)
+
+        if not metadata.get('car_detected', True):
+            result['keywords'] = []
+            result['success'] = True
+            return result
+
+        keywords = metadata_to_keywords(metadata, fuzzy_numbers=fuzzy_numbers)
+        result['keywords'] = keywords
+
+        if not dry_run and keywords:
+            target_path = get_target_path(image_path, output_dir)
+            write_xmp_keywords(target_path, keywords, source_image=image_path, merge=True)
+            result['target_path'] = str(target_path)
+
+        result['success'] = True
+
+    except Exception as e:
+        result['error'] = str(e)
+        logger.error(f"Error processing {image_path.name}: {e}")
+
+    return result
+
+
 def main():
     args = parse_args()
     setup_logging(args.verbose, args.log_file)
@@ -561,34 +614,80 @@ def main():
     if args.dry_run:
         logger.info("DRY RUN - no XMP files will be written")
 
-    for i, image_path in enumerate(images, 1):
-        logger.info(f"[{i}/{len(images)}] Processing {image_path.name}...")
+    # Pipelined processing: encode next image while running inference on current
+    # This overlaps the ~0.3-0.5s encoding time with the ~5s inference time
+    from concurrent.futures import ThreadPoolExecutor
 
-        result = process_single_image(
-            image_path=image_path,
-            inference=inference,
-            profile=args.profile,
-            fuzzy_numbers=args.fuzzy_numbers,
-            output_dir=args.output_dir,
-            dry_run=args.dry_run
-        )
+    def encode_image_task(img_path):
+        """Background task to encode an image."""
+        try:
+            return inference.encode_image(img_path)
+        except Exception as e:
+            logger.debug(f"Failed to pre-encode {img_path.name}: {e}")
+            return None
 
-        results.append(result)
+    # Pre-encode the first image
+    next_encoded = None
+    if images:
+        logger.debug(f"Pre-encoding first image: {images[0].name}")
+        next_encoded = encode_image_task(images[0])
 
-        if result['success']:
-            processed += 1
-            tracker.mark_processed(image_path, result['keywords'])
-            if not result.get('car_detected', True):
-                kw_str = '(no car detected)'
-                no_car_count += 1
-            elif result['keywords']:
-                kw_str = ', '.join(result['keywords'])
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        for i, image_path in enumerate(images, 1):
+            logger.info(f"[{i}/{len(images)}] Processing {image_path.name}...")
+
+            # Get pre-encoded data for current image
+            current_encoded = next_encoded
+
+            # Start encoding next image in background (if there is one)
+            next_future = None
+            if i < len(images):
+                next_future = executor.submit(encode_image_task, images[i])
+
+            # Process current image
+            if current_encoded:
+                result = process_with_encoded_image(
+                    image_path=image_path,
+                    image_data=current_encoded,
+                    inference=inference,
+                    profile=args.profile,
+                    fuzzy_numbers=args.fuzzy_numbers,
+                    output_dir=args.output_dir,
+                    dry_run=args.dry_run
+                )
             else:
-                kw_str = '(no keywords)'
-            logger.info(f"  -> {kw_str} ({result['inference_time']:.1f}s)")
-        else:
-            failed += 1
-            logger.warning(f"  -> FAILED: {result['error']}")
+                # Fallback if pre-encoding failed
+                result = process_single_image(
+                    image_path=image_path,
+                    inference=inference,
+                    profile=args.profile,
+                    fuzzy_numbers=args.fuzzy_numbers,
+                    output_dir=args.output_dir,
+                    dry_run=args.dry_run
+                )
+
+            # Get pre-encoded data for next iteration
+            if next_future:
+                next_encoded = next_future.result()
+            else:
+                next_encoded = None
+
+            results.append(result)
+
+            if result['success']:
+                processed += 1
+                tracker.mark_processed(image_path, result['keywords'])
+                if not result.get('car_detected', True):
+                    kw_str = '(no car detected)'
+                    no_car_count += 1
+                elif result['keywords']:
+                    kw_str = ', '.join(result['keywords'])
+                else:
+                    kw_str = '(no keywords)'
+                logger.info(f"  -> {kw_str} ({result['inference_time']:.1f}s)")
+            else:
+                failed += 1
+                logger.warning(f"  -> FAILED: {result['error']}")
 
     # Summary
     logger.info("-" * 50)
