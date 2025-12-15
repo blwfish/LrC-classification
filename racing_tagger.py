@@ -105,7 +105,13 @@ Examples:
         '--model',
         type=str,
         default=None,
-        help='Override default model (e.g., llava:7b, llava:13b, llava:34b)'
+        help='Override default model (e.g., qwen2.5vl:7b, qwen2.5vl:72b)'
+    )
+
+    parser.add_argument(
+        '--warm-up',
+        action='store_true',
+        help='Pre-load model into GPU memory before processing (faster first image)'
     )
 
     parser.add_argument(
@@ -538,6 +544,10 @@ def main():
     except Exception as e:
         logger.error(f"Failed to initialize inference engine: {e}")
         sys.exit(1)
+
+    # Optional warm-up: pre-load model into GPU memory
+    if args.warm_up:
+        inference.warm_up()
 
     # Process images
     results = []
