@@ -21,7 +21,12 @@ Only return the JSON, no other text."""
 # Porsche-specific prompt with PCA class knowledge
 PORSCHE_RACING_PROMPT = """Analyze this Porsche Club of America (PCA) racing photograph.
 
-Extract information as JSON with these fields:
+FIRST: Determine if there is a car visible in the image. If there is NO CAR (e.g., people, landscapes,
+pit crew, trophies, buildings, or any non-car subject), return:
+{{"car_detected": false, "make": null, "model": null, "color": null, "class": null, "numbers": []}}
+
+If a car IS visible, extract information as JSON with these fields:
+- car_detected: true
 - make: Should be "Porsche" (or other if not a Porsche)
 - model: Specific Porsche model. Common models include:
   * 911 variants: 911, 911 GT3, 911 GT3 RS, 911 GT3 Cup, 911 RSR, 911 Carrera
@@ -38,15 +43,18 @@ Extract information as JSON with these fields:
 - class: ONLY include if you can clearly read a class sticker/text on the windshield or body.
   Do NOT guess the class based on the car type. Omit this field if not clearly readable.
   Valid classes: SPB, SPC, SPD, SPE, GT1-GT5, GTC1-GTC6, SP996, SP997, SP991, Stock, Improved
-- numbers: Array of racing numbers visible (typically on doors and/or hood)
+- numbers: Array of RACING numbers visible (typically large numbers on doors, hood, or roof)
 {fuzzy_instruction}
 
 IMPORTANT:
+- If NO CAR is visible (people, landscapes, pit scenes without cars, etc.), set car_detected to false
 - Only report what you can clearly SEE in the image
 - Do NOT guess or infer class from car model - only report class if you read it as text
 - For COLOR: Look at the actual paint. White is White, not GT Silver. Only use GT Silver for true metallic silver.
-- Numbers are large and on doors/hood - report all visible car numbers
-- If multiple cars are visible, report all visible numbers
+- RACING NUMBERS vs BADGES: Only report large racing numbers painted/vinyl on doors, hood, or roof.
+  Do NOT report "911", "718", "GT3", "GT4", or "992" from small model badges on the car body.
+  Racing numbers are typically 1-3 digits, large, and prominently displayed for competition.
+- If multiple cars are visible, report all visible racing numbers
 
 Return ONLY valid JSON, no other text."""
 
@@ -62,7 +70,12 @@ NO_FUZZY_INSTRUCTION = ""
 # General racing prompt (non-Porsche specific)
 GENERAL_RACING_PROMPT = """Analyze this motorsport racing photograph.
 
-Extract information as JSON:
+FIRST: Determine if there is a car visible in the image. If there is NO CAR (e.g., people, landscapes,
+pit crew, trophies, buildings, or any non-car subject), return:
+{{"car_detected": false, "make": null, "model": null, "color": null, "class": null, "numbers": []}}
+
+If a car IS visible, extract information as JSON:
+- car_detected: true
 - make: Car manufacturer
 - model: Specific model if identifiable
 - color: Primary body color
