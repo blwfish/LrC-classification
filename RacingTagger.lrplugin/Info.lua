@@ -15,9 +15,6 @@ return {
             file = 'TagPhotosDryRun.lua',
         },
         {
-            title = '-',  -- Separator
-        },
-        {
             title = 'Tag Folder(s)',
             file = 'TagFolder.lua',
         },
@@ -38,5 +35,5 @@ return {
         },
     },
 
-    VERSION = { major=1, minor=1, revision=0, build=1 },
+    VERSION = { major=1, minor=1, revision=0, build=2 },
 }
