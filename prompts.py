@@ -21,11 +21,18 @@ Only return the JSON, no other text."""
 # Porsche-specific prompt with PCA class knowledge
 PORSCHE_RACING_PROMPT = """Analyze this Porsche Club of America (PCA) racing photograph.
 
-FIRST: Determine if there is a car visible in the image. If there is NO CAR (e.g., people, landscapes,
-pit crew, trophies, buildings, or any non-car subject), return:
+FIRST: Determine if a car is the PRIMARY SUBJECT of this image.
+Return car_detected: false if:
+- There is NO car in the image (people, landscapes, trophies, buildings)
+- The car is only partially visible at the edge of the frame
+- The car is a tiny part of the image (less than ~20% of the frame)
+- The image is primarily showing people, pit crews, paddock scenes, or other non-car subjects
+- You cannot clearly see enough of the car to identify its details
+
+If car_detected is false, return:
 {{"car_detected": false, "make": null, "model": null, "color": null, "class": null, "numbers": []}}
 
-If a car IS visible, extract information as JSON with these fields:
+If a car IS the primary subject (prominently featured, clearly visible), extract information as JSON:
 - car_detected: true
 - make: Should be "Porsche" (or other if not a Porsche)
 - model: Specific Porsche model. Common models include:
@@ -47,8 +54,9 @@ If a car IS visible, extract information as JSON with these fields:
 {fuzzy_instruction}
 
 IMPORTANT:
-- If NO CAR is visible (people, landscapes, pit scenes without cars, etc.), set car_detected to false
-- Only report what you can clearly SEE in the image
+- Set car_detected to false unless a car is the PRIMARY SUBJECT of the image
+- Paddock scenes, pit crews, people, or images where the car is only a small/partial element should return car_detected: false
+- Only report what you can clearly SEE in the image - do NOT guess or hallucinate details
 - Do NOT guess or infer class from car model - only report class if you read it as text
 - For COLOR: Look at the actual paint. White is White, not GT Silver. Only use GT Silver for true metallic silver.
 - RACING NUMBERS vs BADGES: Only report large racing numbers painted/vinyl on doors, hood, or roof.
@@ -70,11 +78,18 @@ NO_FUZZY_INSTRUCTION = ""
 # General racing prompt (non-Porsche specific)
 GENERAL_RACING_PROMPT = """Analyze this motorsport racing photograph.
 
-FIRST: Determine if there is a car visible in the image. If there is NO CAR (e.g., people, landscapes,
-pit crew, trophies, buildings, or any non-car subject), return:
+FIRST: Determine if a car is the PRIMARY SUBJECT of this image.
+Return car_detected: false if:
+- There is NO car in the image (people, landscapes, trophies, buildings)
+- The car is only partially visible at the edge of the frame
+- The car is a tiny part of the image (less than ~20% of the frame)
+- The image is primarily showing people, pit crews, paddock scenes, or other non-car subjects
+- You cannot clearly see enough of the car to identify its details
+
+If car_detected is false, return:
 {{"car_detected": false, "make": null, "model": null, "color": null, "class": null, "numbers": []}}
 
-If a car IS visible, extract information as JSON:
+If a car IS the primary subject (prominently featured, clearly visible), extract information as JSON:
 - car_detected: true
 - make: Car manufacturer
 - model: Specific model if identifiable
