@@ -1,86 +1,115 @@
 # Racing Tagger - Session Checkpoint
 
-**Date:** 2024-12-15
+**Date:** 2024-12-18
 
 ## Current Status
 
-**Completed:** Full test on dev-export4 (7,509 images)
-- **Success rate:** 99.97% (7,507 successful, 2 failed due to HTTP 500)
-- **Average time:** ~6 seconds/image on M4 Max with Metal
-- **Total runtime:** ~12 hours
+**Production Ready** - Successfully tested on 7,509 images with 99.97% success rate.
 
-## Recent Fixes (2024-12-15)
+## Recent Changes (2024-12-18)
 
-### 1. No-Car Detection
-- **Issue:** Non-car images (people, landscapes, pit scenes) were getting false positive car tags
-- **Fix:** Updated prompts to explicitly detect when no car is present
-- **Result:** Model now returns `car_detected: false` for non-car images
-- **Files:** `prompts.py`, `racing_tagger.py`
-
-### 2. Badge Number False Positives
-- **Issue:** Model was detecting "911" from model badges instead of actual racing numbers
-- **Fix:** Added explicit instructions to distinguish racing numbers from badge numbers
-- **Result:** Model now ignores "911", "718", "GT3", "GT4", "992" badges
+### 1. Improved False Positive Detection
+- **Issue:** Paddock scenes with tiny/partial cars were getting hallucinated tags (e.g., pit crew photo with car sliver at edge → "Porsche 911 #202")
+- **Fix:** Updated prompts to require car to be PRIMARY SUBJECT of image
+- **Result:** Returns `car_detected: false` for:
+  - Partial cars at frame edges
+  - Cars <20% of frame
+  - Paddock/pit scenes where people are main subject
 - **Files:** `prompts.py`
 
-### 3. README Updates
-- Updated recommended model to qwen2.5vl:7b
-- Added actual benchmark results from 7,509 image test
-- Updated processing speed estimates
+### 2. Lightroom Classic Plugin
+- **New:** Cross-platform plugin (macOS + Windows)
+- **Location:** `RacingTagger.lrplugin/`
+- **Menu:** Library → Plug-in Extras → Racing Tagger
+  - Tag Selected Photos
+  - Tag Selected Photos (Dry Run)
+  - Tag Folder(s)
+  - Tag Folder(s) (Dry Run)
+- Runs tagger in background, returns to LrC immediately
+- After completion: Metadata → Read Metadata from Files
 
-## Performance Observed
+## Previous Session (2024-12-15)
 
-- **Hardware:** M4 Max with Metal GPU acceleration
-- **Model:** qwen2.5vl:7b via Ollama (qwen2.5vl:72b also available)
-- **Speed:** ~5-7 seconds per image (avg ~6s)
-- **GPU Usage:** ~85%
-- **Memory:** ~6GB for 7b model (of 128GB system)
-- **System Impact:** Essentially transparent - barely noticeable in foreground use
-
-## Test Dataset
-
-- **Location:** `/Volumes/Additional Files/development/dev-export4`
-- **Images:** 7,509 total
-- **Types:** NEF, TIF, DNG (RAW + edited variants)
-- **Content:** Mixed racing photos - multiple events, cameras, includes some non-car images
+- Full test on 7,509 images: 99.97% success rate
+- Added no-car detection for non-car images
+- Fixed badge number false positives (911, GT3, etc.)
+- Benchmarked at ~6 seconds/image on M4 Max
 
 ## Repository
 
 - **Gitea:** http://localhost:3000/blw/LrC-classification
 - **GitHub:** https://github.com/blwfish/LrC-classification
 
-## Files Modified This Session
+## Architecture
 
-1. `racing_tagger.py` - Added no-car detection, improved logging
-2. `prompts.py` - Added car_detected field, badge number exclusion
-3. `README.md` - Updated benchmarks and model recommendations
-
-## Known Edge Cases
-
-- **Fisheye/multi-car shots:** Challenging for 7b model due to distortion
-  - Example: `_BLW2844-2.NEF` (checkered flag from flag stand)
-  - May improve with 72b model (now downloaded, untested)
-
-## Available Models
-
-```bash
-ollama list | grep qwen
-# qwen2.5vl:72b  48 GB
-# qwen2.5vl:7b   6.0 GB
 ```
+racing-tagger/
+├── racing_tagger.py        # Main CLI tool
+├── llama_inference.py      # Ollama vision model integration
+├── xmp_writer.py           # XMP sidecar writing via exiftool
+├── prompts.py              # Vision prompts by profile
+├── progress_tracker.py     # Resume capability
+├── setup.sh                # Installation script (macOS/Linux)
+├── RacingTagger.lrplugin/  # Lightroom Classic plugin
+│   ├── Info.lua            # Plugin manifest
+│   ├── Config.lua          # Cross-platform paths/commands
+│   ├── TaggerCore.lua      # Shared functionality
+│   ├── TagPhotos.lua       # Tag selected photos
+│   ├── TagPhotosDryRun.lua
+│   ├── TagFolder.lua       # Tag entire folder(s)
+│   └── TagFolderDryRun.lua
+├── README.md
+├── CHECKPOINT.md           # This file
+└── WINDOWS_SETUP.md        # Windows installation guide
+```
+
+## Requirements
+
+### All Platforms
+- Python 3.10+
+- Ollama with `qwen2.5vl:7b` model
+- exiftool (for XMP writing)
+
+### macOS
+- Apple Silicon recommended (Metal acceleration)
+- `brew install ollama exiftool`
+- Plugin: `~/Library/Application Support/Adobe/Lightroom/Modules/`
+
+### Windows 11
+- NVIDIA GPU recommended (CUDA acceleration)
+- Python in PATH
+- Ollama from https://ollama.ai
+- exiftool from https://exiftool.org (add to PATH)
+- Plugin: `%APPDATA%\Adobe\Lightroom\Modules\`
 
 ## Quick Commands
 
 ```bash
-# Test on single image
+# Test single image
 python3 racing_tagger.py /path/to/image.NEF --dry-run --verbose
 
-# Test with 72b model
-python3 racing_tagger.py /path/to/image.NEF --model qwen2.5vl:72b --dry-run --verbose
-
 # Process directory
-python3 racing_tagger.py /path/to/images --verbose --log-file run.log
+python3 racing_tagger.py /path/to/images --verbose
 
 # Resume interrupted run
 python3 racing_tagger.py /path/to/images --resume --verbose
+
+# Use larger model (slower, not necessarily better)
+python3 racing_tagger.py /path/to/image.NEF --model qwen2.5vl:72b --dry-run --verbose
 ```
+
+## Performance (M4 Max)
+
+| Metric | Value |
+|--------|-------|
+| Model | qwen2.5vl:7b (6GB) |
+| Speed | ~5-6 sec/image |
+| GPU | ~85% Metal |
+| Memory | ~8GB during inference |
+
+## Known Limitations
+
+- Fisheye/heavily distorted shots can confuse number detection
+- Multi-car pileup shots may miss some numbers
+- Very dark/backlit images have lower accuracy
+- First image after cold start takes ~6s extra (model loading)
