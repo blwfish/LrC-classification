@@ -1,0 +1,189 @@
+--[[
+    Racing Tagger - Configuration
+
+    Cross-platform configuration for the Racing Tagger plugin.
+    Detects OS and sets appropriate paths.
+]]
+
+local LrPathUtils = import 'LrPathUtils'
+local LrFileUtils = import 'LrFileUtils'
+local LrSystemInfo = import 'LrSystemInfo'
+
+local Config = {}
+
+-- Detect platform
+function Config.isWindows()
+    return WIN_ENV == true
+end
+
+function Config.isMac()
+    return MAC_ENV == true
+end
+
+-- Get the plugin's directory (where the .lrplugin folder is)
+function Config.getPluginDir()
+    return _PLUGIN.path
+end
+
+-- Get the racing tagger script directory
+-- The plugin is in RacingTagger.lrplugin/, script is in parent
+function Config.getTaggerDir()
+    local pluginPath = _PLUGIN.path
+    -- Go up one level from the .lrplugin folder
+    return LrPathUtils.parent(pluginPath)
+end
+
+-- Get Python executable path
+function Config.getPythonPath()
+    if Config.isWindows() then
+        -- Common Windows Python locations
+        local candidates = {
+            'python',  -- If in PATH
+            'python3', -- If in PATH
+            'C:\\Python312\\python.exe',
+            'C:\\Python311\\python.exe',
+            'C:\\Python310\\python.exe',
+            'C:\\Users\\' .. (os.getenv('USERNAME') or '') .. '\\AppData\\Local\\Programs\\Python\\Python312\\python.exe',
+            'C:\\Users\\' .. (os.getenv('USERNAME') or '') .. '\\AppData\\Local\\Programs\\Python\\Python311\\python.exe',
+            'C:\\Users\\' .. (os.getenv('USERNAME') or '') .. '\\AppData\\Local\\Programs\\Python\\Python310\\python.exe',
+        }
+        for _, path in ipairs(candidates) do
+            -- For 'python' or 'python3', assume it works if in PATH
+            if not path:find('\\') then
+                return path
+            end
+            if LrFileUtils.exists(path) then
+                return path
+            end
+        end
+        return 'python'  -- Fallback, hope it's in PATH
+    else
+        -- macOS / Linux
+        local candidates = {
+            '/usr/bin/python3',
+            '/usr/local/bin/python3',
+            '/opt/homebrew/bin/python3',
+        }
+        for _, path in ipairs(candidates) do
+            if LrFileUtils.exists(path) then
+                return path
+            end
+        end
+        return 'python3'  -- Fallback
+    end
+end
+
+-- Get the racing tagger script path
+function Config.getTaggerScript()
+    local taggerDir = Config.getTaggerDir()
+    return LrPathUtils.child(taggerDir, 'racing_tagger.py')
+end
+
+-- Get temp directory
+function Config.getTempDir()
+    return LrPathUtils.getStandardFilePath('temp')
+end
+
+-- Get log file path
+function Config.getLogFile()
+    if Config.isWindows() then
+        return LrPathUtils.child(os.getenv('TEMP') or 'C:\\Temp', 'racing_tagger.log')
+    else
+        return '/tmp/racing_tagger.log'
+    end
+end
+
+-- Get output log path
+function Config.getOutputLog()
+    if Config.isWindows() then
+        return LrPathUtils.child(os.getenv('TEMP') or 'C:\\Temp', 'racing_tagger_output.log')
+    else
+        return '/tmp/racing_tagger_output.log'
+    end
+end
+
+-- Quote a path for shell command (handles spaces and special chars)
+function Config.quotePath(path)
+    if Config.isWindows() then
+        -- Windows: use double quotes, escape internal quotes
+        return '"' .. path:gsub('"', '""') .. '"'
+    else
+        -- macOS/Linux: use double quotes, escape internal quotes and backslashes
+        return '"' .. path:gsub('\\', '\\\\'):gsub('"', '\\"') .. '"'
+    end
+end
+
+-- Build command to run tagger in background
+function Config.buildBackgroundCommand(taggerArgs)
+    local python = Config.getPythonPath()
+    local script = Config.getTaggerScript()
+    local outputLog = Config.getOutputLog()
+
+    if Config.isWindows() then
+        -- Windows: use 'start /b' for background execution
+        return string.format(
+            'start /b "" %s %s %s > %s 2>&1',
+            Config.quotePath(python),
+            Config.quotePath(script),
+            taggerArgs,
+            Config.quotePath(outputLog)
+        )
+    else
+        -- macOS/Linux: use nohup with &
+        return string.format(
+            'nohup %s %s %s > %s 2>&1 &',
+            Config.quotePath(python),
+            Config.quotePath(script),
+            taggerArgs,
+            outputLog
+        )
+    end
+end
+
+-- Build command to run a batch script in background
+function Config.buildBatchCommand(scriptPath)
+    local outputLog = Config.getOutputLog()
+
+    if Config.isWindows() then
+        return string.format(
+            'start /b "" cmd /c %s > %s 2>&1',
+            Config.quotePath(scriptPath),
+            Config.quotePath(outputLog)
+        )
+    else
+        return string.format(
+            'nohup bash %s > %s 2>&1 &',
+            Config.quotePath(scriptPath),
+            outputLog
+        )
+    end
+end
+
+-- Get batch script extension
+function Config.getBatchExtension()
+    if Config.isWindows() then
+        return '.bat'
+    else
+        return '.sh'
+    end
+end
+
+-- Write batch script header
+function Config.getBatchHeader()
+    if Config.isWindows() then
+        return '@echo off\r\n'
+    else
+        return '#!/bin/bash\n'
+    end
+end
+
+-- Get line ending for batch scripts
+function Config.getLineEnding()
+    if Config.isWindows() then
+        return '\r\n'
+    else
+        return '\n'
+    end
+end
+
+return Config
