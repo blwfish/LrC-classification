@@ -34,3 +34,4 @@ Thumbs.db
 # Test outputs
 test_run.log
 benchmark.log
+run.out
