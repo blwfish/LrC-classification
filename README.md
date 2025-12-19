@@ -6,7 +6,9 @@ Automatically extract metadata from racing photography using local vision AI and
 
 - **Local inference** - No cloud API, your images stay on your machine
 - **Porsche/PCA optimized** - Specialized prompts for Porsche Club of America racing
+- **Lightroom Classic plugin** - Tag photos directly from within Lightroom
 - **Lightroom integration** - Writes standard XMP keywords that Lightroom imports automatically
+- **Cross-platform** - Works on macOS and Windows 11
 - **Resumable** - Track progress and resume interrupted runs
 - **Hardware accelerated** - Uses Metal (Mac) or CUDA (NVIDIA) when available
 
@@ -14,17 +16,19 @@ Automatically extract metadata from racing photography using local vision AI and
 
 - Python 3.10+
 - [Ollama](https://ollama.ai) for local vision model inference
-- A vision model (qwen2.5vl:7b recommended)
+- Vision model: `qwen2.5vl:7b` (recommended)
+- [exiftool](https://exiftool.org) for writing XMP metadata
 
 ### Hardware
 
-**Mac (recommended):**
+**macOS (recommended):**
 - Apple Silicon (M1/M2/M3/M4) for Metal acceleration
 - 16GB+ RAM recommended
 
-**Windows/Linux:**
+**Windows 11:**
 - NVIDIA GPU with 8GB+ VRAM for CUDA acceleration
-- Or CPU-only (slower)
+- Or CPU-only (slower, ~30-60 sec/image)
+- See [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for detailed installation guide
 
 ## Installation
 
@@ -47,7 +51,30 @@ Automatically extract metadata from racing photography using local vision AI and
 
 ## Usage
 
-### Basic Usage
+### Lightroom Classic Plugin (Recommended)
+
+The easiest way to use Racing Tagger is via the Lightroom Classic plugin:
+
+1. **Install the plugin:**
+   - macOS: Copy or symlink `RacingTagger.lrplugin` to `~/Library/Application Support/Adobe/Lightroom/Modules/`
+   - Windows: Copy `RacingTagger.lrplugin` to `%APPDATA%\Adobe\Lightroom\Modules\`
+
+2. **Restart Lightroom Classic**
+
+3. **Select photos** in Library module
+
+4. **Run the tagger:** Library → Plug-in Extras → Racing Tagger
+   - **Tag Selected Photos** - Process individual selected images
+   - **Tag Folder(s)** - Process entire folder(s) containing selected images
+   - **Dry Run** variants - Preview what would be detected without writing files
+
+5. **Import keywords:** After processing completes, select the photos and use Metadata → Read Metadata from Files
+
+The tagger runs in background so you can continue working in Lightroom. Check progress in the log file:
+- macOS: `/tmp/racing_tagger_output.log`
+- Windows: `%TEMP%\racing_tagger_output.log`
+
+### Command Line
 
 ```bash
 # Process a directory of images
@@ -185,13 +212,23 @@ ollama pull qwen2.5vl:7b
 
 ```
 racing-tagger/
-├── racing_tagger.py      # Main CLI tool
-├── llama_inference.py    # Ollama/llama.cpp integration
-├── xmp_writer.py         # XMP sidecar writing
-├── prompts.py            # Vision prompts by profile
-├── progress_tracker.py   # Resume capability
-├── setup.sh              # Installation script
-└── README.md             # This file
+├── racing_tagger.py        # Main CLI tool
+├── llama_inference.py      # Ollama/llama.cpp integration
+├── xmp_writer.py           # XMP sidecar writing (via exiftool)
+├── prompts.py              # Vision prompts by profile
+├── progress_tracker.py     # Resume capability
+├── setup.sh                # Installation script (macOS/Linux)
+├── RacingTagger.lrplugin/  # Lightroom Classic plugin
+│   ├── Info.lua            # Plugin manifest
+│   ├── Config.lua          # Cross-platform configuration
+│   ├── TaggerCore.lua      # Shared functionality
+│   ├── TagPhotos.lua       # Tag selected photos
+│   ├── TagPhotosDryRun.lua
+│   ├── TagFolder.lua       # Tag folder(s)
+│   └── TagFolderDryRun.lua
+├── README.md               # This file
+├── WINDOWS_SETUP.md        # Windows installation guide
+└── CHECKPOINT.md           # Development status
 ```
 
 ### Adding New Profiles
