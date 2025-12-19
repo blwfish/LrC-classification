@@ -6,6 +6,8 @@ Automatically extracts metadata from racing photography using local vision model
 and writes keywords to XMP sidecars for Lightroom searchability.
 """
 
+__version__ = '1.1.0'
+
 import argparse
 import json
 import logging
@@ -42,6 +44,12 @@ Examples:
   %(prog)s /path/to/images --dry-run --verbose
   %(prog)s /path/to/images --resume  # Continue from last run
         """
+    )
+
+    parser.add_argument(
+        '--version',
+        action='version',
+        version=f'%(prog)s {__version__}'
     )
 
     parser.add_argument(
