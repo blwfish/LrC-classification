@@ -471,9 +471,13 @@ def process_single_image(
         keywords = metadata_to_keywords(metadata, fuzzy_numbers=fuzzy_numbers)
         result['keywords'] = keywords
 
-        if not dry_run and keywords:
+        if not dry_run:
             # Determine where to write (XMP sidecar for RAW, embed for JPG)
             target_path = get_target_path(image_path, output_dir)
+
+            # Always write at least a marker keyword to indicate processing completed
+            if not keywords:
+                keywords = ['Classified']
 
             # Write keywords (exiftool handles merging)
             write_xmp_keywords(target_path, keywords, source_image=image_path, merge=True)
@@ -527,8 +531,13 @@ def process_with_encoded_image(
         keywords = metadata_to_keywords(metadata, fuzzy_numbers=fuzzy_numbers)
         result['keywords'] = keywords
 
-        if not dry_run and keywords:
+        if not dry_run:
             target_path = get_target_path(image_path, output_dir)
+
+            # Always write at least a marker keyword to indicate processing completed
+            if not keywords:
+                keywords = ['Classified']
+
             write_xmp_keywords(target_path, keywords, source_image=image_path, merge=True)
             result['target_path'] = str(target_path)
 
