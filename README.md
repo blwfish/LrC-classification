@@ -141,6 +141,32 @@ Num:73
 Num:173?     (uncertain, with fuzzy-numbers flag)
 ```
 
+### Hierarchical Keyword Display
+
+Keywords are written as hierarchical paths, so they display as expandable trees in Lightroom's Keyword List:
+
+```
+▼ AI Keywords
+  ▼ Class
+    SPB
+    SPA
+  ▼ Color
+    Black
+    Blue
+    Red
+  ▼ Make
+    Porsche
+  ▼ Model
+    718Cayman
+    911GT3
+    911GT3Cup
+  ▼ Num
+    73
+    92
+```
+
+This structure makes it easy to browse and filter keywords visually in Lightroom.
+
 ### Searching in Lightroom
 
 After importing XMP sidecars, search in Lightroom using:
@@ -148,6 +174,7 @@ After importing XMP sidecars, search in Lightroom using:
 - `Num:73` - Car number 73
 - `Class:SPB` - SPB class cars
 - `Color:Blue` - Blue cars
+- Or browse the hierarchical tree in the Keyword List panel
 
 ## How It Works
 

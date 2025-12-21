@@ -1,9 +1,12 @@
 """
 Keyword Writer for Lightroom
 
-Uses exiftool to write keywords to:
+Uses exiftool to write hierarchical keywords to:
 - XMP sidecar files (for RAW files like NEF, CR2, ARW)
 - Directly into image files (for JPG, TIFF, PNG)
+
+Writes keywords using pipe-separated hierarchical paths (e.g., AI Keywords|Make|Porsche)
+that Lightroom displays as expandable tree structures in the Keyword List panel.
 
 Exiftool handles all the XMP format complexity and ensures
 compatibility with Lightroom's expected metadata structure.
@@ -18,7 +21,13 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # Check if exiftool is available
+# First try to find it in PATH, then try Windows default location
 EXIFTOOL_PATH = shutil.which('exiftool')
+if not EXIFTOOL_PATH:
+    # Try Windows default installation location
+    windows_exiftool = 'C:\\Windows\\exiftool\\exiftool.exe'
+    if Path(windows_exiftool).exists():
+        EXIFTOOL_PATH = windows_exiftool
 
 # File extensions that require XMP sidecars (can't embed metadata)
 RAW_EXTENSIONS = {'.nef', '.cr2', '.cr3', '.arw', '.raf', '.orf', '.rw2', '.dng', '.raw'}
@@ -57,6 +66,46 @@ def get_target_path(image_path: Path, output_dir: Optional[Path] = None) -> Path
     else:
         # Embed in image
         return image_path
+
+
+def build_hierarchical_keywords(keywords: list[str]) -> str:
+    """
+    Build hierarchical keyword paths for Lightroom's HierarchicalSubject field.
+
+    Converts flat keywords like ["Make:Porsche", "Model:Cayman", "Color:Black"]
+    into comma-separated pipe-delimited paths that Lightroom displays as expandable trees.
+
+    IMPORTANT: Include ALL levels of the hierarchy (root, parent, and leaf nodes)
+    so Lightroom recognizes the parent-child relationships.
+
+    Format: AI Keywords, AI Keywords|Make, AI Keywords|Make|Porsche, AI Keywords|Color, AI Keywords|Color|Black
+
+    Args:
+        keywords: List of keywords in "Category:Value" format
+
+    Returns:
+        Comma-separated all-levels hierarchical paths for HierarchicalSubject field
+    """
+    hierarchical_paths = set()
+
+    # Always include the root level
+    hierarchical_paths.add('AI Keywords')
+
+    # For each keyword, add all levels of the hierarchy
+    for keyword in keywords:
+        if ':' not in keyword:
+            continue
+
+        category, value = keyword.split(':', 1)
+
+        # Add parent level (category)
+        hierarchical_paths.add(f'AI Keywords|{category}')
+
+        # Add leaf level (complete path)
+        hierarchical_paths.add(f'AI Keywords|{category}|{value}')
+
+    # Return as comma-separated string, sorted for consistency
+    return ', '.join(sorted(hierarchical_paths))
 
 
 def read_existing_keywords(file_path: Path) -> list[str]:
@@ -106,14 +155,27 @@ def write_xmp_keywords(
     merge: bool = True
 ) -> bool:
     """
-    Write keywords using exiftool.
+    Write keywords using exiftool in hierarchical format for Lightroom.
+
+    Writes to both:
+    - Subject field (flat): Make:Porsche, Model:911, Color:Blue
+    - HierarchicalSubject field (hierarchical): AI Keywords|Make|Porsche, AI Keywords|Model|911, AI Keywords|Color|Blue
+
+    Lightroom displays the HierarchicalSubject as an expandable tree:
+        ▼ AI Keywords
+          ▼ Make
+            Porsche
+          ▼ Model
+            911
+          ▼ Color
+            Blue
 
     For RAW files, target_path should be the XMP sidecar.
     For JPG/TIFF, target_path is the image itself.
 
     Args:
         target_path: Path to write keywords to (XMP sidecar or image file)
-        keywords: List of keywords to write
+        keywords: List of keywords to write (format: "Category:Value")
         source_image: Original image (used to create XMP sidecar if needed)
         merge: If True, add to existing keywords; if False, replace
 
@@ -129,18 +191,15 @@ def write_xmp_keywords(
         return True
 
     try:
+        # Build hierarchical keyword paths for Lightroom
+        hierarchical_keywords = build_hierarchical_keywords(keywords)
+
+        if not hierarchical_keywords:
+            logger.debug("No valid keywords to write")
+            return True
+
         # Build exiftool command
         cmd = [EXIFTOOL_PATH, '-overwrite_original']
-
-        if merge:
-            # Add keywords (append to existing)
-            for kw in keywords:
-                cmd.extend([f'-Subject+={kw}'])
-        else:
-            # Replace all keywords
-            cmd.append('-Subject=')  # Clear existing
-            for kw in keywords:
-                cmd.extend([f'-Subject+={kw}'])
 
         # If writing to XMP sidecar that doesn't exist, create from source image
         if target_path.suffix.lower() == '.xmp' and not target_path.exists():
@@ -148,6 +207,27 @@ def write_xmp_keywords(
                 # Create XMP sidecar from source image metadata
                 create_cmd = [EXIFTOOL_PATH, '-o', str(target_path), str(source_image)]
                 subprocess.run(create_cmd, capture_output=True, timeout=30)
+
+        # Write hierarchical keywords using pipe-separated paths
+        # Lightroom reads Subject field and displays pipe-separated paths as expandable trees
+        if merge:
+            # Add hierarchical paths to both Subject and HierarchicalSubject
+            # Subject field: use pipe-separated paths that Lightroom can parse as hierarchy
+            for path in hierarchical_keywords.split(', '):
+                cmd.append(f'-Subject+={path}')
+            # HierarchicalSubject field: for compatibility with other apps
+            for path in hierarchical_keywords.split(', '):
+                cmd.append(f'-XMP-lr:HierarchicalSubject+={path}')
+        else:
+            # Replace all keywords with hierarchical structure
+            # Clear old Subject keywords first
+            cmd.append('-Subject=')
+            # Write new hierarchical keywords to Subject with pipe separators
+            for path in hierarchical_keywords.split(', '):
+                cmd.append(f'-Subject+={path}')
+            # Also write to HierarchicalSubject for compatibility
+            for path in hierarchical_keywords.split(', '):
+                cmd.append(f'-XMP-lr:HierarchicalSubject+={path}')
 
         cmd.append(str(target_path))
 
@@ -159,7 +239,7 @@ def write_xmp_keywords(
         )
 
         if result.returncode == 0:
-            logger.debug(f"Wrote {len(keywords)} keywords to {target_path}")
+            logger.debug(f"Wrote keywords (flat and hierarchical) to {target_path}")
             return True
         else:
             logger.error(f"exiftool error: {result.stderr}")
