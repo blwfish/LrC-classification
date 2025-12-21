@@ -158,7 +158,9 @@ After importing XMP sidecars, search in Lightroom using:
 
 ## Processing Speed
 
-### Model Comparison (M4 Max, 128GB)
+### Model Comparison
+
+**M4 Max (128GB RAM, Metal acceleration):**
 
 | Model | Size | Speed (cached) | Memory | Recommendation |
 |-------|------|----------------|--------|----------------|
@@ -166,15 +168,31 @@ After importing XMP sidecars, search in Lightroom using:
 | qwen2.5vl:32b | 21GB | ~15.5s/img | ~24GB | No quality improvement over 7b |
 | qwen2.5vl:72b | 48GB | ~31s/img | ~51GB | Slower, different but not better results |
 
+**Windows (Ryzen 9 5950X + RTX 3060, CUDA acceleration):**
+
+| Model | Size | Speed | Recommendation |
+|-------|------|-------|----------------|
+| qwen2.5vl:7b | 6GB | ~25s/img | Good for batch processing overnight |
+
 **Note:** First image after model load incurs a cold-start penalty (~6s for 7b, ~17s for 32b, ~50s for 72b). Subsequent images benefit from model caching via `keep_alive: 30m`.
 
 ### Estimated Processing Times
 
-| Dataset Size | Time (7b, cached) |
-|--------------|-------------------|
+**M4 Max (qwen2.5vl:7b, cached):**
+
+| Dataset Size | Time |
+|--------------|------|
 | 100 images | ~9 min |
 | 1,000 images | ~1.5 hours |
 | 10,000 images | ~15 hours |
+
+**Windows/CUDA (qwen2.5vl:7b, Ryzen 9 5950X + RTX 3060):**
+
+| Dataset Size | Time |
+|--------------|------|
+| 100 images | ~42 min |
+| 1,000 images | ~7 hours |
+| 10,000 images | ~70 hours (~3 days) |
 
 Run in background with `--resume` for interruption tolerance.
 
