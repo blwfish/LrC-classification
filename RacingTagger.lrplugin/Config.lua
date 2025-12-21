@@ -1,8 +1,9 @@
 --[[
-    Racing Tagger - Configuration
+    Racing Tagger - Configuration (Fixed)
 
     Cross-platform configuration for the Racing Tagger plugin.
     Detects OS and sets appropriate paths.
+    FIXED: No os.getenv() calls - uses Lightroom APIs only
 ]]
 
 local LrPathUtils = import 'LrPathUtils'
@@ -38,14 +39,11 @@ function Config.getPythonPath()
     if Config.isWindows() then
         -- Common Windows Python locations
         local candidates = {
-            'python',  -- If in PATH
-            'python3', -- If in PATH
+            'python',      -- If in PATH
+            'python3',     -- If in PATH
             'C:\\Python312\\python.exe',
             'C:\\Python311\\python.exe',
             'C:\\Python310\\python.exe',
-            'C:\\Users\\' .. (os.getenv('USERNAME') or '') .. '\\AppData\\Local\\Programs\\Python\\Python312\\python.exe',
-            'C:\\Users\\' .. (os.getenv('USERNAME') or '') .. '\\AppData\\Local\\Programs\\Python\\Python311\\python.exe',
-            'C:\\Users\\' .. (os.getenv('USERNAME') or '') .. '\\AppData\\Local\\Programs\\Python\\Python310\\python.exe',
         }
         for _, path in ipairs(candidates) do
             -- For 'python' or 'python3', assume it works if in PATH
@@ -79,26 +77,28 @@ function Config.getTaggerScript()
     return LrPathUtils.child(taggerDir, 'racing_tagger.py')
 end
 
--- Get temp directory
+-- Get temp directory using Lightroom API (not os.getenv!)
 function Config.getTempDir()
     return LrPathUtils.getStandardFilePath('temp')
 end
 
--- Get log file path
+-- Get log file path using Lightroom's temp directory
 function Config.getLogFile()
+    local tempDir = LrPathUtils.getStandardFilePath('temp')
     if Config.isWindows() then
-        return LrPathUtils.child(os.getenv('TEMP') or 'C:\\Temp', 'racing_tagger.log')
+        return LrPathUtils.child(tempDir, 'racing_tagger.log')
     else
-        return '/tmp/racing_tagger.log'
+        return LrPathUtils.child(tempDir, 'racing_tagger.log')
     end
 end
 
--- Get output log path
+-- Get output log path using Lightroom's temp directory
 function Config.getOutputLog()
+    local tempDir = LrPathUtils.getStandardFilePath('temp')
     if Config.isWindows() then
-        return LrPathUtils.child(os.getenv('TEMP') or 'C:\\Temp', 'racing_tagger_output.log')
+        return LrPathUtils.child(tempDir, 'racing_tagger_output.log')
     else
-        return '/tmp/racing_tagger_output.log'
+        return LrPathUtils.child(tempDir, 'racing_tagger_output.log')
     end
 end
 
