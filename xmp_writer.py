@@ -184,9 +184,10 @@ def validate_keyword_format(keyword: str) -> bool:
     - Class:SPB
     - Num:73
     - Num:173?  (uncertain)
+    - Classified (marker for processed with no metadata)
     """
     valid_prefixes = ['Make:', 'Model:', 'Color:', 'Class:', 'Num:']
-    return any(keyword.startswith(prefix) for prefix in valid_prefixes)
+    return keyword == 'Classified' or any(keyword.startswith(prefix) for prefix in valid_prefixes)
 
 
 def keywords_to_dict(keywords: list[str]) -> dict:
