@@ -139,7 +139,10 @@ Color:Blue
 Class:SPB
 Num:73
 Num:173?     (uncertain, with fuzzy-numbers flag)
+Classified   (marker indicating image was processed but no metadata detected)
 ```
+
+**Note:** The `Classified` keyword is automatically added when an image is processed but no racing metadata is detected. This helps distinguish between "not yet processed" and "processed with no detections".
 
 ### Searching in Lightroom
 
