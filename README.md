@@ -144,6 +144,32 @@ Classified   (marker indicating image was processed but no metadata detected)
 
 **Note:** The `Classified` keyword is automatically added when an image is processed but no racing metadata is detected. This helps distinguish between "not yet processed" and "processed with no detections".
 
+### Hierarchical Keyword Display
+
+Keywords are written as hierarchical paths, so they display as expandable trees in Lightroom's Keyword List:
+
+```
+▼ AI Keywords
+  ▼ Class
+    SPB
+    SPA
+  ▼ Color
+    Black
+    Blue
+    Red
+  ▼ Make
+    Porsche
+  ▼ Model
+    718Cayman
+    911GT3
+    911GT3Cup
+  ▼ Num
+    73
+    92
+```
+
+This structure makes it easy to browse and filter keywords visually in Lightroom.
+
 ### Searching in Lightroom
 
 After importing XMP sidecars, search in Lightroom using:
@@ -151,6 +177,7 @@ After importing XMP sidecars, search in Lightroom using:
 - `Num:73` - Car number 73
 - `Class:SPB` - SPB class cars
 - `Color:Blue` - Blue cars
+- Or browse the hierarchical tree in the Keyword List panel
 
 ## How It Works
 
