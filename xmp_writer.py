@@ -182,11 +182,15 @@ def validate_keyword_format(keyword: str) -> bool:
     - Model:CaymanGT4
     - Color:Blue
     - Class:SPB
+    - Subcategory:Cup (NASCAR subcategory)
+    - Engine:Chevrolet (IndyCar engine manufacturer)
     - Num:73
     - Num:173?  (uncertain)
+    - Sequence:Best (best frame in sequence)
+    - Sequence:SEQ_2024-12-22_14-35-26 (sequence membership)
     - Classified (marker for processed with no metadata)
     """
-    valid_prefixes = ['Make:', 'Model:', 'Color:', 'Class:', 'Num:']
+    valid_prefixes = ['Make:', 'Model:', 'Color:', 'Class:', 'Subcategory:', 'Engine:', 'Num:', 'Sequence:']
     return keyword == 'Classified' or any(keyword.startswith(prefix) for prefix in valid_prefixes)
 
 
@@ -201,6 +205,8 @@ def keywords_to_dict(keywords: list[str]) -> dict:
         'model': [],
         'color': [],
         'class': [],
+        'subcategory': [],
+        'engine': [],
         'num': [],
         'num_uncertain': [],
         'other': [],
@@ -215,6 +221,10 @@ def keywords_to_dict(keywords: list[str]) -> dict:
             result['color'].append(kw[6:])
         elif kw.startswith('Class:'):
             result['class'].append(kw[6:])
+        elif kw.startswith('Subcategory:'):
+            result['subcategory'].append(kw[12:])
+        elif kw.startswith('Engine:'):
+            result['engine'].append(kw[7:])
         elif kw.startswith('Num:'):
             num = kw[4:]
             if num.endswith('?'):

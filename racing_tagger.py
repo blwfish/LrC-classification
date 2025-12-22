@@ -60,7 +60,15 @@ Examples:
 
     parser.add_argument(
         '--profile',
-        choices=['racing-porsche', 'racing-general', 'college-sports'],
+        choices=[
+            'racing-porsche',
+            'racing-general',
+            'racing-nascar',
+            'racing-imsa',
+            'racing-world-challenge',
+            'racing-indycar',
+            'college-sports'
+        ],
         default='racing-porsche',
         help='Processing profile (default: racing-porsche)'
     )
@@ -141,6 +149,32 @@ Examples:
         type=Path,
         default=None,
         help='Write logs to file in addition to console'
+    )
+
+    # Sequence detection options
+    parser.add_argument(
+        '--detect-sequences',
+        action='store_true',
+        help='Enable sequence detection and sharpness scoring'
+    )
+
+    parser.add_argument(
+        '--sequence-threshold',
+        type=float,
+        default=0.5,
+        help='Max seconds between frames in a sequence (default: 0.5)'
+    )
+
+    parser.add_argument(
+        '--sequence-dry-run',
+        action='store_true',
+        help='Preview sequence detection without writing XMP'
+    )
+
+    parser.add_argument(
+        '--skip-sequence-sharpness',
+        action='store_true',
+        help='Skip sharpness scoring (only detect sequences by timestamp)'
     )
 
     return parser.parse_args()
@@ -309,6 +343,8 @@ def parse_model_response(response: str) -> dict:
         'model': None,
         'color': None,
         'class': None,
+        'subcategory': None,  # NASCAR subcategory (Cup, LateModel, etc.)
+        'engine': None,       # IndyCar engine manufacturer (Chevrolet, Honda)
         'numbers': [],
         'fuzzy_numbers': [],
         'raw_response': response
@@ -347,6 +383,8 @@ def parse_model_response(response: str) -> dict:
             metadata['model'] = data.get('model')
             metadata['color'] = data.get('color')
             metadata['class'] = data.get('class')
+            metadata['subcategory'] = data.get('subcategory')  # NASCAR
+            metadata['engine'] = data.get('engine')            # IndyCar
 
             # Handle numbers - with hallucination detection
             nums = data.get('numbers', data.get('number', []))
@@ -417,6 +455,14 @@ def metadata_to_keywords(metadata: dict, fuzzy_numbers: bool = False) -> list[st
 
     if metadata.get('class'):
         keywords.append(f"Class:{metadata['class']}")
+
+    # NASCAR subcategory (Cup, Truck, LateModel, Modified, Sportsman)
+    if metadata.get('subcategory'):
+        keywords.append(f"Subcategory:{metadata['subcategory']}")
+
+    # IndyCar engine manufacturer (Chevrolet, Honda)
+    if metadata.get('engine'):
+        keywords.append(f"Engine:{metadata['engine']}")
 
     # Primary numbers (confident)
     for num in metadata.get('numbers', []):
@@ -566,6 +612,44 @@ def main():
         sys.exit(1)
 
     logger.info(f"Found {len(images)} images to process")
+
+    # Sequence detection (runs on all images, before resume filtering)
+    if args.detect_sequences:
+        from sequence_stacking import (
+            SequenceDetector, SharpnessScorer,
+            print_sequence_preview, write_sequence_metadata
+        )
+
+        logger.info(f"Detecting sequences (threshold: {args.sequence_threshold}s)...")
+        detector = SequenceDetector()
+        sequences = detector.detect_sequences(images, args.sequence_threshold)
+
+        if sequences:
+            # Score sharpness unless skipped
+            if not args.skip_sequence_sharpness:
+                logger.info("Scoring sharpness for sequence frames...")
+                scorer = SharpnessScorer()
+                for i, seq in enumerate(sequences, 1):
+                    logger.info(f"  Scoring sequence {i}/{len(sequences)}: {seq.sequence_id}")
+                    scorer.score_sequence(seq)
+
+            # Dry run: preview and exit
+            if args.sequence_dry_run:
+                print_sequence_preview(sequences)
+                sys.exit(0)
+
+            # Write sequence metadata
+            if not args.dry_run:
+                logger.info("Writing sequence keywords...")
+                for seq in sequences:
+                    write_sequence_metadata(seq, output_dir=args.output_dir, dry_run=False)
+                logger.info(f"Sequence metadata written for {len(sequences)} sequences")
+            else:
+                logger.info(f"[DRY RUN] Would write sequence metadata for {len(sequences)} sequences")
+        else:
+            if args.sequence_dry_run:
+                print("No sequences detected.")
+                sys.exit(0)
 
     # Setup progress tracker
     tracker_path = args.input_path if args.input_path.is_dir() else args.input_path.parent
