@@ -63,6 +63,14 @@ IMPORTANT:
   Do NOT report "911", "718", "GT3", "GT4", or "992" from small model badges on the car body.
   Racing numbers are typically 1-3 digits, large, and prominently displayed for competition.
 - If multiple cars are visible, report all visible racing numbers
+- PRIMARY CAR SELECTION: When multiple cars are visible, report make/model/color/class for the car that is:
+  1. Most prominent in the frame (largest, most centered)
+  2. In sharpest focus
+  Ignore cars that are mostly outside the frame, blurry, or in the background entirely.
+- DO NOT HALLUCINATE NUMBERS: Only report car numbers you can ACTUALLY READ CLEARLY in the image.
+  For head-on or rear shots where the number is not visible, return an empty numbers array [].
+  Do NOT guess numbers based on car livery, sponsor colors, or any other inference.
+  Do NOT report numbers from blurry or out-of-focus cars.
 
 Return ONLY valid JSON, no other text."""
 
@@ -136,6 +144,14 @@ IMPORTANT:
 - NASCAR numbers are typically LARGE and prominently displayed on doors, hood, and roof
 - Do NOT report small sponsor numbers or badge numbers
 - Focus on the primary racing number(s)
+- PRIMARY CAR SELECTION: When multiple cars are visible, report make/color/subcategory for the car that is:
+  1. Most prominent in the frame (largest, most centered)
+  2. In sharpest focus
+  Ignore cars that are mostly outside the frame, blurry, or in the background entirely.
+- DO NOT HALLUCINATE NUMBERS: Only report car numbers you can ACTUALLY READ CLEARLY in the image.
+  For head-on or rear shots where the number is not visible, return an empty numbers array [].
+  Do NOT guess numbers based on car livery, sponsor colors, or any other inference.
+  Do NOT report numbers from blurry or out-of-focus cars.
 
 Return ONLY valid JSON, no other text."""
 
@@ -179,6 +195,16 @@ If a car IS the primary subject, extract information as JSON:
 - model: Specific model if identifiable (911 GT3 R, M4 GT3, C8.R, 296 GT3, etc.)
 - color: Primary color(s)
 {fuzzy_instruction}
+
+IMPORTANT:
+- PRIMARY CAR SELECTION: When multiple cars are visible, report make/model/color/class for the car that is:
+  1. Most prominent in the frame (largest, most centered)
+  2. In sharpest focus
+  Ignore cars that are mostly outside the frame, blurry, or in the background entirely.
+- DO NOT HALLUCINATE NUMBERS: Only report car numbers you can ACTUALLY READ CLEARLY in the image.
+  For head-on or rear shots where the number is not visible, return an empty numbers array [].
+  Do NOT guess numbers based on car livery, sponsor colors, or any other inference.
+  Do NOT report numbers from blurry or out-of-focus cars.
 
 Return ONLY valid JSON, no other text."""
 

@@ -2,6 +2,33 @@
 
 All notable changes to the Racing Tagger project will be documented in this file.
 
+## [1.2.0] - 2025-12-23
+
+### Fixed
+- **Color as List Bug**: Fixed issue where model returning color as a list (e.g., `['black', 'blue', 'purple']`) caused malformed keywords in Lightroom
+  - Now joins list elements with " and " (e.g., "black and blue and purple")
+- **Numbers Containing Non-Numeric Values**: Fixed parsing to filter out non-numeric values from numbers array
+  - Only digit strings are now accepted as car numbers
+
+### Changed
+- **Primary Car Selection**: Updated all prompts (Porsche, NASCAR, IMSA) to prioritize the car that is:
+  1. Most prominent in the frame (largest, most centered)
+  2. In sharpest focus
+  - Cars mostly outside the frame, blurry, or in background are now ignored entirely
+- **Anti-Hallucination Guidance**: Added explicit instructions to prevent number hallucination
+  - Only report numbers that can be ACTUALLY READ CLEARLY
+  - Return empty numbers array for head-on/rear shots where number isn't visible
+  - Do not guess numbers from livery, sponsor colors, or other inference
+  - Do not report numbers from blurry or out-of-focus cars
+
+### Testing
+- Tested IMSA profile on 1,237 images from 2018 IMSA VIR event
+- Tested NASCAR profile on 534 images from 2024 SOBO Thunder Road event
+- Verified primary car selection works for multi-car shots
+- Confirmed hierarchical keywords display correctly in Lightroom
+
+---
+
 ## [1.1.1] - 2025-12-21
 
 ### Fixed
