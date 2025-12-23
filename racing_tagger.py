@@ -6,7 +6,7 @@ Automatically extracts metadata from racing photography using local vision model
 and writes keywords to XMP sidecars for Lightroom searchability.
 """
 
-__version__ = '1.1.1'
+__version__ = '1.2.0'
 
 import argparse
 import json
@@ -381,7 +381,14 @@ def parse_model_response(response: str) -> dict:
             metadata['car_detected'] = True
             metadata['make'] = data.get('make')
             metadata['model'] = data.get('model')
-            metadata['color'] = data.get('color')
+
+            # Handle color - may be a list from model output
+            color = data.get('color')
+            if isinstance(color, list):
+                # Join multiple colors with " and "
+                color = ' and '.join(str(c) for c in color if c)
+            metadata['color'] = color
+
             metadata['class'] = data.get('class')
             metadata['subcategory'] = data.get('subcategory')  # NASCAR
             metadata['engine'] = data.get('engine')            # IndyCar
@@ -390,7 +397,8 @@ def parse_model_response(response: str) -> dict:
             nums = data.get('numbers', data.get('number', []))
             if isinstance(nums, (str, int)):
                 nums = [nums]
-            nums = [str(n) for n in nums if n]
+            # Filter to only numeric values (avoid color names ending up in numbers)
+            nums = [str(n) for n in nums if n and str(n).isdigit()]
 
             # Detect hallucination: too many numbers or excessive repetition
             if len(nums) > 10:
