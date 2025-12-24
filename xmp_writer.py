@@ -93,6 +93,11 @@ def build_hierarchical_keywords(keywords: list[str]) -> str:
 
     # For each keyword, add all levels of the hierarchy
     for keyword in keywords:
+        # Special case: "NoSubject" creates only two-level hierarchy (no value level)
+        if keyword == 'NoSubject':
+            hierarchical_paths.add('AI Keywords|No Subject')
+            continue
+
         if ':' not in keyword:
             continue
 

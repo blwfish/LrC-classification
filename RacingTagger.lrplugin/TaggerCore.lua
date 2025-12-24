@@ -54,6 +54,9 @@ end
 
 -- Run tagger on a single path (file or directory)
 function TaggerCore.runOnPath(path, dryRun, resume)
+    -- Clean up any old completion file before starting
+    Config.deleteCompletionFile()
+
     local args = Config.quotePath(path) .. ' --verbose'
 
     if dryRun then
@@ -77,6 +80,9 @@ function TaggerCore.runOnMultipleFiles(paths, dryRun)
     if #paths == 0 then
         return false
     end
+
+    -- Clean up any old completion file before starting
+    Config.deleteCompletionFile()
 
     local tempDir = Config.getTempDir()
     local scriptFile = LrPathUtils.child(tempDir, 'racing_tagger_batch' .. Config.getBatchExtension())
@@ -143,6 +149,9 @@ function TaggerCore.runOnFolders(folders, dryRun, resume)
     end
 
     -- Multiple folders - create batch script
+    -- Clean up any old completion file before starting
+    Config.deleteCompletionFile()
+
     local tempDir = Config.getTempDir()
     local scriptFile = LrPathUtils.child(tempDir, 'racing_tagger_batch' .. Config.getBatchExtension())
     local lineEnd = Config.getLineEnding()
@@ -214,6 +223,129 @@ function TaggerCore.showStartedMessage(count, itemType, dryRun)
     end
 
     LrDialogs.message('Racing Tagger', message, 'info')
+end
+
+-- Monitor for completion and show results dialog
+function TaggerCore.monitorCompletion(expectedCount, itemType, dryRun)
+    LrTasks.startAsyncTask(function()
+        local completionFile = Config.getCompletionFile()
+        local maxWaitTime = 14400  -- 4 hours max (increased from 2 for large batches)
+        local pollInterval = 5     -- Check every 5 seconds (reduced from 2 to be less aggressive)
+        local stabilityWaitTime = 45   -- Wait 45 seconds after sequence reaches expectedCount
+                                        -- Gives time for final stats to be written and settled
+        local elapsed = 0
+        local lastSequence = nil
+        local stableTime = 0
+        local loggedProgress = false
+
+        logger:info('Monitoring for completion... (expecting ' .. expectedCount .. ' files)')
+
+        while elapsed < maxWaitTime do
+            LrTasks.sleep(pollInterval)
+            elapsed = elapsed + pollInterval
+
+            if LrFileUtils.exists(completionFile) then
+                logger:info('Completion file detected')
+
+                -- Parse stats and watch sequence number
+                -- Sequence increments each time a file finishes in batch processing
+                local stats = Config.parseCompletionFile(completionFile)
+
+                if stats and stats.sequence then
+                    if stats.sequence == expectedCount then
+                        -- We've reached the expected number of files - now wait for stability
+                        if lastSequence == stats.sequence then
+                            -- Sequence hasn't changed since last check
+                            stableTime = stableTime + pollInterval
+                        else
+                            -- Sequence just updated to expectedCount, reset stability timer
+                            stableTime = 0
+                            lastSequence = stats.sequence
+                            logger:info('Sequence reached expected count (' .. expectedCount .. '), starting stability timer')
+                        end
+
+                        -- Once we reach expectedCount, wait for stability period to ensure final stats are written
+                        if stableTime >= stabilityWaitTime then
+                            logger:info('Sequence stable at ' .. stats.sequence .. ' (expected ' .. expectedCount .. '), all processing done')
+                            LrTasks.sleep(0.5)  -- Ensure file fully written
+
+                            stats = Config.parseCompletionFile(completionFile)
+
+                            if stats then
+                                TaggerCore.showCompletionDialog(stats, itemType)
+                            else
+                                -- Fallback if parsing fails
+                                LrDialogs.message('Racing Tagger',
+                                    'Processing complete! Check log for details:\n' ..
+                                    Config.getOutputLog(), 'info')
+                            end
+
+                            Config.deleteCompletionFile()
+                            return
+                        end
+                    else
+                        -- Still waiting for more files to finish
+                        if not loggedProgress or (elapsed % 60 == 0) then  -- Log progress every 60 seconds
+                            logger:info('Sequence at ' .. stats.sequence .. ' of ' .. expectedCount .. ', continuing to monitor')
+                            loggedProgress = true
+                        end
+                        lastSequence = stats.sequence
+                        stableTime = 0
+                    end
+                end
+            end
+        end
+
+        -- Timeout
+        logger:error('Completion monitoring timed out')
+        LrDialogs.message('Racing Tagger',
+            'Processing is taking longer than expected.\n\n' ..
+            'Check log for status:\n' .. Config.getOutputLog(),
+            'info')
+    end)
+end
+
+-- Show completion dialog with results
+function TaggerCore.showCompletionDialog(stats, itemType)
+    local message
+    local title = 'Racing Tagger Complete'
+
+    if stats.dry_run then
+        message = string.format(
+            'DRY RUN completed!\n\n' ..
+            'Processed: %d %s\n' ..
+            'Successful: %d\n' ..
+            'Failed: %d\n',
+            stats.total_images, itemType,
+            stats.successful, stats.failed
+        )
+        if stats.no_car and stats.no_car > 0 then
+            message = message .. string.format('No car detected: %d\n', stats.no_car)
+        end
+        if stats.avg_time and stats.avg_time > 0 then
+            message = message .. string.format('\nAverage time: %.1f seconds per image\n\n', stats.avg_time)
+        end
+        message = message .. 'No files were modified (dry run mode).'
+    else
+        message = string.format(
+            'Processing completed!\n\n' ..
+            'Processed: %d %s\n' ..
+            'Successful: %d\n' ..
+            'Failed: %d\n',
+            stats.total_images, itemType,
+            stats.successful, stats.failed
+        )
+        if stats.no_car and stats.no_car > 0 then
+            message = message .. string.format('No car detected: %d\n', stats.no_car)
+        end
+        if stats.avg_time and stats.avg_time > 0 then
+            message = message .. string.format('\nAverage time: %.1f seconds per image\n\n', stats.avg_time)
+        end
+        message = message .. 'Keywords written to XMP sidecars.\n\nSelect photos and use:\nMetadata > Read Metadata from Files'
+    end
+
+    local messageType = (stats.failed and stats.failed > 0) and 'warning' or 'info'
+    LrDialogs.message(title, message, messageType)
 end
 
 return TaggerCore

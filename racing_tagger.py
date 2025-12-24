@@ -305,6 +305,7 @@ def parse_model_response(response: str) -> dict:
     """Parse the model's response into structured metadata."""
     metadata = {
         'car_detected': True,  # Assume true for backwards compatibility
+        'people_detected': False,  # Whether people are visible in the image
         'make': None,
         'model': None,
         'color': None,
@@ -339,7 +340,11 @@ def parse_model_response(response: str) -> dict:
             car_detected = data.get('car_detected', True)
             if car_detected is False or str(car_detected).lower() == 'false':
                 metadata['car_detected'] = False
-                # Return early with no car data
+                # Still check for people even if no car detected
+                people_detected = data.get('people_detected', False)
+                if people_detected is True or str(people_detected).lower() == 'true':
+                    metadata['people_detected'] = True
+                # Return early with no car data but possible people
                 return metadata
 
             metadata['car_detected'] = True
@@ -347,6 +352,11 @@ def parse_model_response(response: str) -> dict:
             metadata['model'] = data.get('model')
             metadata['color'] = data.get('color')
             metadata['class'] = data.get('class')
+
+            # Check if people are present
+            people_detected = data.get('people_detected', False)
+            if people_detected is True or str(people_detected).lower() == 'true':
+                metadata['people_detected'] = True
 
             # Handle numbers - with hallucination detection
             nums = data.get('numbers', data.get('number', []))
@@ -428,6 +438,11 @@ def metadata_to_keywords(metadata: dict, fuzzy_numbers: bool = False) -> list[st
             if num not in metadata.get('numbers', []):
                 keywords.append(f"Num:{num}?")
 
+    # People detection (adds "People:People" when people are visible)
+    # This will create the hierarchy: AI Keywords | People | People
+    if metadata.get('people_detected'):
+        keywords.append("People:People")
+
     return keywords
 
 
@@ -462,14 +477,17 @@ def process_single_image(
         result['metadata'] = metadata
         result['car_detected'] = metadata.get('car_detected', True)
 
-        # Only generate keywords if a car was detected
-        if not metadata.get('car_detected', True):
-            result['keywords'] = []
-            result['success'] = True
-            return result
+        # Generate keywords if either a car was detected OR people were detected
+        car_detected = metadata.get('car_detected', True)
+        people_detected = metadata.get('people_detected', False)
 
-        keywords = metadata_to_keywords(metadata, fuzzy_numbers=fuzzy_numbers)
-        result['keywords'] = keywords
+        if not car_detected and not people_detected:
+            # No car and no people - tag as "No Subject" (two-level hierarchy only)
+            keywords = ['NoSubject']
+            result['keywords'] = keywords
+        else:
+            keywords = metadata_to_keywords(metadata, fuzzy_numbers=fuzzy_numbers)
+            result['keywords'] = keywords
 
         if not dry_run:
             # Determine where to write (XMP sidecar for RAW, embed for JPG)
@@ -523,13 +541,17 @@ def process_with_encoded_image(
         result['metadata'] = metadata
         result['car_detected'] = metadata.get('car_detected', True)
 
-        if not metadata.get('car_detected', True):
-            result['keywords'] = []
-            result['success'] = True
-            return result
+        # Generate keywords if either a car was detected OR people were detected
+        car_detected = metadata.get('car_detected', True)
+        people_detected = metadata.get('people_detected', False)
 
-        keywords = metadata_to_keywords(metadata, fuzzy_numbers=fuzzy_numbers)
-        result['keywords'] = keywords
+        if not car_detected and not people_detected:
+            # No car and no people - tag as "No Subject" (two-level hierarchy only)
+            keywords = ['NoSubject']
+            result['keywords'] = keywords
+        else:
+            keywords = metadata_to_keywords(metadata, fuzzy_numbers=fuzzy_numbers)
+            result['keywords'] = keywords
 
         if not dry_run:
             target_path = get_target_path(image_path, output_dir)
@@ -715,6 +737,77 @@ def main():
 
     if args.dry_run:
         logger.info("DRY RUN complete - no files were modified")
+
+    # Write completion file for Lightroom plugin
+    try:
+        # Determine completion file path - ALWAYS use temp directory to match Config.lua
+        # Config.lua looks for it at: LrPathUtils.child(tempDir, 'racing_tagger_output.complete')
+        import tempfile
+        completion_file = Path(tempfile.gettempdir()) / 'racing_tagger_output.complete'
+
+        # Get cumulative stats from tracker (persistent across invocations)
+        cumulative_total_time = 0
+        if tracker and hasattr(tracker, 'get_stats'):
+            stats = tracker.get_stats()
+            cumulative_total_time = stats.get('total_time', 0)
+
+        # Read sequence number and accumulate stats from existing file (for batch processing)
+        sequence = 0
+        previous_total_images = 0
+        previous_successful = 0
+        previous_failed = 0
+        previous_no_car = 0
+
+        if completion_file.exists():
+            try:
+                with open(completion_file, 'r') as f:
+                    existing = json.load(f)
+                    sequence = existing.get('sequence', 0) + 1
+                    # Extract previous accumulated stats (but NOT total_time - tracker has that)
+                    if 'stats' in existing:
+                        previous_total_images = existing['stats'].get('total_images', 0)
+                        previous_successful = existing['stats'].get('successful', 0)
+                        previous_failed = existing['stats'].get('failed', 0)
+                        previous_no_car = existing['stats'].get('no_car', 0)
+            except:
+                sequence = 1
+        else:
+            sequence = 1
+
+        # Accumulate stats across all invocations in the batch
+        accumulated_total_images = previous_total_images + (len(images) if images else 0)
+        accumulated_successful = previous_successful + processed
+        accumulated_failed = previous_failed + failed
+        accumulated_no_car = previous_no_car + no_car_count
+        # Use tracker's cumulative total_time directly (don't double-count)
+        accumulated_total_time = cumulative_total_time
+
+        # Calculate cumulative average time per image
+        if accumulated_successful > 0:
+            accumulated_avg_time = accumulated_total_time / accumulated_successful
+        else:
+            accumulated_avg_time = 0
+
+        completion_data = {
+            'completed': True,
+            'sequence': sequence,  # Increments each time a file finishes (batch processing)
+            'timestamp': datetime.now().isoformat(),
+            'stats': {
+                'total_images': accumulated_total_images,
+                'successful': accumulated_successful,
+                'failed': accumulated_failed,
+                'no_car': accumulated_no_car,
+                'avg_time_per_image': accumulated_avg_time,
+                'total_time': accumulated_total_time
+            },
+            'dry_run': args.dry_run
+        }
+
+        with open(completion_file, 'w') as f:
+            json.dump(completion_data, f, indent=2)
+        logger.debug(f"Wrote completion file: {completion_file}")
+    except Exception as e:
+        logger.warning(f"Failed to write completion file: {e}")
 
     # Save detailed results
     if args.log_file:

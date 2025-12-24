@@ -186,4 +186,40 @@ function Config.getLineEnding()
     end
 end
 
+-- Get completion file path (matches Python's location in temp directory)
+function Config.getCompletionFile()
+    local tempDir = LrPathUtils.getStandardFilePath('temp')
+    return LrPathUtils.child(tempDir, 'racing_tagger_output.complete')
+end
+
+-- Parse completion file JSON (simple pattern matching, no JSON library needed)
+function Config.parseCompletionFile(filePath)
+    local f = io.open(filePath, 'r')
+    if not f then
+        return nil
+    end
+
+    local content = f:read('*all')
+    f:close()
+
+    local stats = {}
+    stats.sequence = tonumber(content:match('"sequence"%s*:%s*(%d+)')) or 0
+    stats.total_images = tonumber(content:match('"total_images"%s*:%s*(%d+)')) or 0
+    stats.successful = tonumber(content:match('"successful"%s*:%s*(%d+)')) or 0
+    stats.failed = tonumber(content:match('"failed"%s*:%s*(%d+)')) or 0
+    stats.no_car = tonumber(content:match('"no_car"%s*:%s*(%d+)')) or 0
+    stats.avg_time = tonumber(content:match('"avg_time_per_image"%s*:%s*([%d%.]+)')) or 0
+    stats.dry_run = content:match('"dry_run"%s*:%s*true') ~= nil
+
+    return stats
+end
+
+-- Delete completion file
+function Config.deleteCompletionFile()
+    local filePath = Config.getCompletionFile()
+    if LrFileUtils.exists(filePath) then
+        LrFileUtils.delete(filePath)
+    end
+end
+
 return Config
