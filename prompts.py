@@ -21,19 +21,29 @@ Only return the JSON, no other text."""
 # Porsche-specific prompt with PCA class knowledge
 PORSCHE_RACING_PROMPT = """Analyze this Porsche Club of America (PCA) racing photograph.
 
-FIRST: Determine if a car is the PRIMARY SUBJECT of this image.
-Return car_detected: false if:
-- There is NO car in the image (people, landscapes, trophies, buildings)
+YOU MUST COMPLETE BOTH STEPS AND RETURN BOTH car_detected AND people_detected FIELDS IN EVERY RESPONSE!
+
+STEP 1: Determine if a car is the PRIMARY SUBJECT of this image.
+car_detected should be TRUE only if a car is prominently featured as the main subject.
+car_detected should be FALSE if:
+- There is NO car in the image
 - The car is only partially visible at the edge of the frame
 - The car is a tiny part of the image (less than ~20% of the frame)
 - The image is primarily showing people, pit crews, paddock scenes, or other non-car subjects
 - You cannot clearly see enough of the car to identify its details
 
+STEP 2: Check for PEOPLE in the image (REQUIRED - always check and report this field).
+Scan the ENTIRE image including: foreground, background, track sides, pits, paddock, spectator areas, pit crew areas.
+People include: drivers (in cars), mechanics, pit crew members, spectators, photographers, safety personnel, people at race edges.
+people_detected should be TRUE if you see ANY person or people anywhere in the image.
+people_detected should be FALSE only if you carefully examined the image and found absolutely no people present.
+
 If car_detected is false, return:
-{{"car_detected": false, "make": null, "model": null, "color": null, "class": null, "numbers": []}}
+{{"car_detected": false, "people_detected": <boolean>, "make": null, "model": null, "color": null, "class": null, "numbers": []}}
 
 If a car IS the primary subject (prominently featured, clearly visible), extract information as JSON:
 - car_detected: true
+- people_detected: <boolean> - True if any people are visible anywhere in the image, False otherwise
 - make: Should be "Porsche" (or other if not a Porsche)
 - model: Specific Porsche model. Common models include:
   * 911 variants: 911, 911 GT3, 911 GT3 RS, 911 GT3 Cup, 911 RSR, 911 Carrera
@@ -63,6 +73,7 @@ IMPORTANT:
   Do NOT report "911", "718", "GT3", "GT4", or "992" from small model badges on the car body.
   Racing numbers are typically 1-3 digits, large, and prominently displayed for competition.
 - If multiple cars are visible, report all visible racing numbers
+- For people_detected: Report true if you see ANY people (spectators, pit crew, drivers, mechanics, etc.) anywhere in the image
 
 Return ONLY valid JSON, no other text."""
 
@@ -78,19 +89,29 @@ NO_FUZZY_INSTRUCTION = ""
 # General racing prompt (non-Porsche specific)
 GENERAL_RACING_PROMPT = """Analyze this motorsport racing photograph.
 
-FIRST: Determine if a car is the PRIMARY SUBJECT of this image.
-Return car_detected: false if:
-- There is NO car in the image (people, landscapes, trophies, buildings)
+YOU MUST COMPLETE BOTH STEPS AND RETURN BOTH car_detected AND people_detected FIELDS IN EVERY RESPONSE!
+
+STEP 1: Determine if a car is the PRIMARY SUBJECT of this image.
+car_detected should be TRUE only if a car is prominently featured as the main subject.
+car_detected should be FALSE if:
+- There is NO car in the image
 - The car is only partially visible at the edge of the frame
 - The car is a tiny part of the image (less than ~20% of the frame)
 - The image is primarily showing people, pit crews, paddock scenes, or other non-car subjects
 - You cannot clearly see enough of the car to identify its details
 
+STEP 2: Check for PEOPLE in the image (REQUIRED - always check and report this field).
+Scan the ENTIRE image including: foreground, background, track sides, pits, paddock, spectator areas, pit crew areas.
+People include: drivers (in cars), mechanics, pit crew members, spectators, photographers, safety personnel, people at race edges.
+people_detected should be TRUE if you see ANY person or people anywhere in the image.
+people_detected should be FALSE only if you carefully examined the image and found absolutely no people present.
+
 If car_detected is false, return:
-{{"car_detected": false, "make": null, "model": null, "color": null, "class": null, "numbers": []}}
+{{"car_detected": false, "people_detected": <boolean>, "make": null, "model": null, "color": null, "class": null, "numbers": []}}
 
 If a car IS the primary subject (prominently featured, clearly visible), extract information as JSON:
 - car_detected: true
+- people_detected: <boolean> - True if any people are visible anywhere in the image, False otherwise
 - make: Car manufacturer
 - model: Specific model if identifiable
 - color: Primary body color
@@ -102,6 +123,9 @@ Common racing series class systems vary widely. Look for:
 - Class stickers on windshield or body
 - Series-specific livery or badges
 - Number boards or door panels
+
+IMPORTANT:
+- For people_detected: Report true if you see ANY people (spectators, pit crew, drivers, mechanics, etc.) anywhere in the image
 
 Return ONLY valid JSON, no other text."""
 

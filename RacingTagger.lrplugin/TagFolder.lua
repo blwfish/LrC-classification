@@ -37,6 +37,9 @@ LrTasks.startAsyncTask(function()
         end
     end
 
-    TaggerCore.runOnFolders(folders, false, true)  -- resume=true for folder processing
-    TaggerCore.showStartedMessage(#folders, 'folder(s)', false)
+    local success = TaggerCore.runOnFolders(folders, false, true)  -- resume=true for folder processing
+    if success then
+        TaggerCore.showStartedMessage(#folders, 'folder(s)', false)
+        TaggerCore.monitorCompletion(#folders, 'folder(s)', false)
+    end
 end)

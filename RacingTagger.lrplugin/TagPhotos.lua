@@ -18,11 +18,15 @@ LrTasks.startAsyncTask(function()
         return
     end
 
+    local success
     if #paths == 1 then
-        TaggerCore.runOnPath(paths[1], false, false)
+        success = TaggerCore.runOnPath(paths[1], false, false)
     else
-        TaggerCore.runOnMultipleFiles(paths, false)
+        success = TaggerCore.runOnMultipleFiles(paths, false)
     end
 
-    TaggerCore.showStartedMessage(#paths, 'photo(s)', false)
+    if success then
+        TaggerCore.showStartedMessage(#paths, 'photo(s)', false)
+        TaggerCore.monitorCompletion(#paths, 'photo(s)', false)
+    end
 end)
