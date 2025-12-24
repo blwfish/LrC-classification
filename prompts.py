@@ -74,6 +74,14 @@ IMPORTANT:
   Racing numbers are typically 1-3 digits, large, and prominently displayed for competition.
 - If multiple cars are visible, report all visible racing numbers
 - For people_detected: Report true if you see ANY people (spectators, pit crew, drivers, mechanics, etc.) anywhere in the image
+- PRIMARY CAR SELECTION: When multiple cars are visible, report make/model/color/class for the car that is:
+  1. Most prominent in the frame (largest, most centered)
+  2. In sharpest focus
+  Ignore cars that are mostly outside the frame, blurry, or in the background entirely.
+- DO NOT HALLUCINATE NUMBERS: Only report car numbers you can ACTUALLY READ CLEARLY in the image.
+  For head-on or rear shots where the number is not visible, return an empty numbers array [].
+  Do NOT guess numbers based on car livery, sponsor colors, or any other inference.
+  Do NOT report numbers from blurry or out-of-focus cars.
 
 Return ONLY valid JSON, no other text."""
 
@@ -129,6 +137,160 @@ IMPORTANT:
 
 Return ONLY valid JSON, no other text."""
 
+# NASCAR profile (Cup, Truck, Late Model, Modified, Sportsman)
+NASCAR_RACING_PROMPT = """Analyze this NASCAR racing photograph.
+
+FIRST: Determine if a car is the PRIMARY SUBJECT of this image.
+Return car_detected: false if:
+- There is NO car in the image
+- The car is only partially visible at the edge of the frame
+- The car is a tiny part of the image (less than ~20% of the frame)
+- The image is primarily showing people, pit crews, paddock scenes, or other non-car subjects
+
+If car_detected is false, return:
+{{"car_detected": false, "make": null, "model": null, "color": null, "subcategory": null, "numbers": []}}
+
+If a car IS the primary subject, extract information as JSON:
+- car_detected: true
+- numbers: Array of car numbers (look for large numbers on doors, hood, roof)
+- subcategory: Identify the NASCAR tier/category if possible:
+    * Cup - Cup Series (top tier, modern NASCAR body style)
+    * Truck - Truck Series (pickup truck bodies)
+    * LateModel - Late Model (older, aggressive wedge-shaped stock car body)
+    * Modified - Modified (compact, high-angle windshield, open wheel wells)
+    * Sportsman - Sportsman (entry-level, similar to Late Model)
+  Look at body style, graphics, and series indicators for clues. Omit if uncertain.
+- make: Manufacturer if identifiable from badging (Chevrolet, Ford, Toyota, etc.)
+- color: Primary color(s) of car/livery
+{fuzzy_instruction}
+
+IMPORTANT:
+- NASCAR numbers are typically LARGE and prominently displayed on doors, hood, and roof
+- Do NOT report small sponsor numbers or badge numbers
+- Focus on the primary racing number(s)
+- PRIMARY CAR SELECTION: When multiple cars are visible, report make/color/subcategory for the car that is:
+  1. Most prominent in the frame (largest, most centered)
+  2. In sharpest focus
+  Ignore cars that are mostly outside the frame, blurry, or in the background entirely.
+- DO NOT HALLUCINATE NUMBERS: Only report car numbers you can ACTUALLY READ CLEARLY in the image.
+  For head-on or rear shots where the number is not visible, return an empty numbers array [].
+  Do NOT guess numbers based on car livery, sponsor colors, or any other inference.
+  Do NOT report numbers from blurry or out-of-focus cars.
+
+Return ONLY valid JSON, no other text."""
+
+# IMSA profile (all eras: current GTP/GTD, historical ALMS/Grand-Am)
+IMSA_RACING_PROMPT = """Analyze this IMSA racing photograph.
+
+FIRST: Determine if a car is the PRIMARY SUBJECT of this image.
+Return car_detected: false if:
+- There is NO car in the image
+- The car is only partially visible at the edge of the frame
+- The car is a tiny part of the image (less than ~20% of the frame)
+- The image is primarily showing people, pit crews, paddock scenes, or other non-car subjects
+
+If car_detected is false, return:
+{{"car_detected": false, "make": null, "model": null, "color": null, "class": null, "numbers": []}}
+
+If a car IS the primary subject, extract information as JSON:
+- car_detected: true
+- numbers: Array of car numbers visible
+- class: IMSA class - identify from body shape, cockpit design, livery, era:
+  CURRENT ERA (2023+):
+    * GTP - Grand Touring Prototype (LMDh/Hypercar, closed prototype)
+    * GTD - Grand Touring Daytona (GT3 cars, road-car-based)
+    * GTDPro - GTD Professional (same cars as GTD, pro drivers)
+  RECENT ERA (2017-2022):
+    * DPi - Daytona Prototype international (prototype, top class)
+    * GTD - Grand Touring Daytona (GT3 cars)
+    * GTLM - GT Le Mans (factory GT cars like 911 RSR, C8.R, M8 GTE)
+  ALMS/GRAND-AM ERA (2000s-2014):
+    * P1 - Prototype 1 (top prototype class, open cockpit)
+    * P2 - Prototype 2 (spec prototype chassis)
+    * GT1 - Grand Touring 1 (Corvette C6.R, Viper, etc.)
+    * GT2 - Grand Touring 2 (Porsche 911 GT3 RSR, Ferrari F430 GT, etc.)
+    * DP - Daytona Prototype (Grand-Am, closed cockpit prototype)
+    * GT - Grand-Am GT class
+  PROTOTYPE CLASSES (any era):
+    * LMP2 - Le Mans Prototype 2 (spec chassis)
+    * LMP3 - Le Mans Prototype 3 (entry-level)
+  Omit class if truly uncertain - class misidentification is worse than no class.
+- make: Manufacturer (Porsche, BMW, Corvette, Ferrari, Lamborghini, Cadillac, Acura, etc.)
+- model: Specific model if identifiable (911 GT3 R, M4 GT3, C8.R, 296 GT3, etc.)
+- color: Primary color(s)
+{fuzzy_instruction}
+
+IMPORTANT:
+- PRIMARY CAR SELECTION: When multiple cars are visible, report make/model/color/class for the car that is:
+  1. Most prominent in the frame (largest, most centered)
+  2. In sharpest focus
+  Ignore cars that are mostly outside the frame, blurry, or in the background entirely.
+- DO NOT HALLUCINATE NUMBERS: Only report car numbers you can ACTUALLY READ CLEARLY in the image.
+  For head-on or rear shots where the number is not visible, return an empty numbers array [].
+  Do NOT guess numbers based on car livery, sponsor colors, or any other inference.
+  Do NOT report numbers from blurry or out-of-focus cars.
+
+Return ONLY valid JSON, no other text."""
+
+# GT World Challenge America profile
+WORLD_CHALLENGE_PROMPT = """Analyze this GT World Challenge America racing photograph.
+
+FIRST: Determine if a car is the PRIMARY SUBJECT of this image.
+Return car_detected: false if:
+- There is NO car in the image
+- The car is only partially visible at the edge of the frame
+- The car is a tiny part of the image (less than ~20% of the frame)
+- The image is primarily showing people, pit crews, paddock scenes, or other non-car subjects
+
+If car_detected is false, return:
+{{"car_detected": false, "make": null, "model": null, "color": null, "class": null, "numbers": []}}
+
+If a car IS the primary subject, extract information as JSON:
+- car_detected: true
+- numbers: Array of car numbers visible
+- class: GT World Challenge class:
+    * GT - Grand Touring class (GT3 spec cars, highest performance)
+    * GS - Grand Sport class (GT4 spec cars)
+    * TC - Touring Car class (entry-level, production-based)
+  Identify from body type, livery patterns, and vehicle type. Omit if uncertain.
+- make: Manufacturer (BMW, Porsche, Mercedes, Aston Martin, Chevrolet, Lamborghini, etc.)
+- model: Specific model if identifiable
+- color: Primary color(s)
+{fuzzy_instruction}
+
+Return ONLY valid JSON, no other text."""
+
+# IndyCar profile (open-wheel)
+INDYCAR_RACING_PROMPT = """Analyze this IndyCar racing photograph.
+
+FIRST: Determine if a car is the PRIMARY SUBJECT of this image.
+Return car_detected: false if:
+- There is NO car in the image
+- The car is only partially visible at the edge of the frame
+- The car is a tiny part of the image (less than ~20% of the frame)
+- The image is primarily showing people, pit crews, paddock scenes, or other non-car subjects
+
+If car_detected is false, return:
+{{"car_detected": false, "engine": null, "color": null, "numbers": []}}
+
+If a car IS the primary subject, extract information as JSON:
+- car_detected: true
+- numbers: Array of car numbers (look on sidepod, engine cover, or nose)
+- engine: Engine manufacturer if visible from badging on engine cover or sidepod:
+    * Chevrolet
+    * Honda
+  Look for Chevrolet bowtie or Honda "H" logos. Omit if not clearly visible.
+- color: Primary color(s) of livery/paint scheme
+{fuzzy_instruction}
+
+IMPORTANT:
+- IndyCar uses standardized Dallara chassis - all cars have similar shape
+- Numbers are typically on sidepods and engine cover
+- Engine manufacturer logos are usually on engine cover
+- Do NOT guess engine manufacturer if badging is not visible
+
+Return ONLY valid JSON, no other text."""
+
 # College sports prompt (placeholder for future)
 COLLEGE_SPORTS_PROMPT = """Analyze this college sports photograph.
 
@@ -147,7 +309,7 @@ def get_prompt(profile: str, fuzzy_numbers: bool = False) -> str:
     Get the appropriate prompt for a given profile.
 
     Args:
-        profile: One of 'racing-porsche', 'racing-general', 'college-sports'
+        profile: One of the available racing profiles
         fuzzy_numbers: Whether to include fuzzy number detection instructions
 
     Returns:
@@ -158,6 +320,10 @@ def get_prompt(profile: str, fuzzy_numbers: bool = False) -> str:
     prompts = {
         'racing-porsche': PORSCHE_RACING_PROMPT,
         'racing-general': GENERAL_RACING_PROMPT,
+        'racing-nascar': NASCAR_RACING_PROMPT,
+        'racing-imsa': IMSA_RACING_PROMPT,
+        'racing-world-challenge': WORLD_CHALLENGE_PROMPT,
+        'racing-indycar': INDYCAR_RACING_PROMPT,
         'college-sports': COLLEGE_SPORTS_PROMPT,
     }
 
@@ -167,7 +333,15 @@ def get_prompt(profile: str, fuzzy_numbers: bool = False) -> str:
 
 def get_available_profiles() -> list[str]:
     """Return list of available prompt profiles."""
-    return ['racing-porsche', 'racing-general', 'college-sports']
+    return [
+        'racing-porsche',
+        'racing-general',
+        'racing-nascar',
+        'racing-imsa',
+        'racing-world-challenge',
+        'racing-indycar',
+        'college-sports',
+    ]
 
 
 # Additional specialized prompts for edge cases
