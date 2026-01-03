@@ -25,7 +25,19 @@ import urllib.error
 logger = logging.getLogger(__name__)
 
 # Detect available image conversion tools
-MAGICK_PATH = shutil.which('magick') or shutil.which('convert')  # ImageMagick 7 or 6
+# On Windows, only look for 'magick' (not 'convert' which conflicts with Windows disk utility)
+import sys
+if sys.platform == 'win32':
+    MAGICK_PATH = shutil.which('magick')
+    # Check Windows default installation locations if not in PATH
+    if not MAGICK_PATH:
+        for im_dir in Path('C:/Program Files').glob('ImageMagick*'):
+            candidate = im_dir / 'magick.exe'
+            if candidate.exists():
+                MAGICK_PATH = str(candidate)
+                break
+else:
+    MAGICK_PATH = shutil.which('magick') or shutil.which('convert')  # ImageMagick 7 or 6
 SIPS_PATH = shutil.which('sips')  # macOS built-in
 
 
@@ -195,8 +207,9 @@ class LlamaVisionInference:
     NEEDS_PROCESSING = {'.tif', '.tiff', '.psd', '.png', '.bmp'}
 
     # Target size for normalized images (longest edge)
-    # 2500px provides good detail for text/number recognition while keeping file size reasonable
-    NORMALIZE_SIZE = 2500
+    # 1500px balances detail for text/number recognition with model stability
+    # (2500px can cause GGML assertion failures on some images)
+    NORMALIZE_SIZE = 1500
 
     # Track temp files for cleanup
     _temp_files: list[Path] = []

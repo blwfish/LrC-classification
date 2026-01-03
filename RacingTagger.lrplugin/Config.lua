@@ -120,13 +120,26 @@ function Config.buildBackgroundCommand(taggerArgs)
     local outputLog = Config.getOutputLog()
 
     if Config.isWindows() then
-        -- Windows: use 'start /b' for background execution
-        return string.format(
-            'start /b "" %s %s %s > %s 2>&1',
+        -- Windows: write a temp batch file to avoid quote escaping issues
+        local tempDir = Config.getTempDir()
+        local batchFile = LrPathUtils.child(tempDir, 'racing_tagger_single.bat')
+        local f = io.open(batchFile, 'w')
+        if f then
+            f:write('@echo off\r\n')
+            f:write(string.format('%s %s %s > %s 2>&1\r\n',
+                Config.quotePath(python),
+                Config.quotePath(script),
+                taggerArgs,
+                Config.quotePath(outputLog)
+            ))
+            f:close()
+            return string.format('start /b cmd /c %s', Config.quotePath(batchFile))
+        end
+        -- Fallback if file creation fails
+        return string.format('start /b %s %s %s',
             Config.quotePath(python),
             Config.quotePath(script),
-            taggerArgs,
-            Config.quotePath(outputLog)
+            taggerArgs
         )
     else
         -- macOS/Linux: use nohup with &
@@ -145,11 +158,13 @@ function Config.buildBatchCommand(scriptPath)
     local outputLog = Config.getOutputLog()
 
     if Config.isWindows() then
-        return string.format(
-            'start /b "" cmd /c %s > %s 2>&1',
+        -- Use cmd /c with the batch script, redirect output
+        local innerCmd = string.format(
+            '%s > %s 2>&1',
             Config.quotePath(scriptPath),
             Config.quotePath(outputLog)
         )
+        return string.format('start /b cmd /c "%s"', innerCmd)
     else
         return string.format(
             'nohup bash %s > %s 2>&1 &',

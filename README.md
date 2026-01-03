@@ -18,6 +18,7 @@ Automatically extract metadata from racing photography using local vision AI and
 - [Ollama](https://ollama.ai) for local vision model inference
 - Vision model: `qwen2.5vl:7b` (recommended)
 - [exiftool](https://exiftool.org) for writing XMP metadata
+- [ImageMagick](https://imagemagick.org) for image resizing (recommended, improves stability and speed)
 
 ### Hardware
 
@@ -27,6 +28,7 @@ Automatically extract metadata from racing photography using local vision AI and
 
 **Windows 11:**
 - NVIDIA GPU with 8GB+ VRAM for CUDA acceleration
+- ImageMagick 7.x (install with "Add to PATH" option)
 - Or CPU-only (slower, ~30-60 sec/image)
 - See [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for detailed installation guide
 
@@ -254,7 +256,8 @@ After importing XMP sidecars, search in Lightroom using:
 
 | Model | Size | Speed | Recommendation |
 |-------|------|-------|----------------|
-| qwen2.5vl:7b | 6GB | ~25s/img | Good for batch processing overnight |
+| qwen2.5vl:7b | 6GB | ~5-7s/img | **Best choice** with ImageMagick resizing |
+| qwen2.5vl:7b | 6GB | ~25s/img | Without ImageMagick (full-res images) |
 
 **Note:** First image after model load incurs a cold-start penalty (~6s for 7b, ~17s for 32b, ~50s for 72b). Subsequent images benefit from model caching via `keep_alive: 30m`.
 
@@ -268,13 +271,13 @@ After importing XMP sidecars, search in Lightroom using:
 | 1,000 images | ~1.5 hours |
 | 10,000 images | ~15 hours |
 
-**Windows/CUDA (qwen2.5vl:7b, Ryzen 9 5950X + RTX 3060):**
+**Windows/CUDA (qwen2.5vl:7b, Ryzen 9 5950X + RTX 3060 with ImageMagick):**
 
 | Dataset Size | Time |
 |--------------|------|
-| 100 images | ~42 min |
-| 1,000 images | ~7 hours |
-| 10,000 images | ~70 hours (~3 days) |
+| 100 images | ~10-12 min |
+| 1,000 images | ~1.5-2 hours |
+| 10,000 images | ~15-20 hours |
 
 Run in background with `--resume` for interruption tolerance.
 
@@ -305,6 +308,25 @@ ollama pull qwen2.5vl:7b
 1. Make sure XMP files are in the same directory as images
 2. In Lightroom, select images and choose Metadata > Read Metadata from Files
 3. Or enable "Automatically read changes from XMP" in preferences
+
+### GGML assertion failures (Windows)
+
+If you see `GGML_ASSERT` errors, install ImageMagick to enable image resizing:
+1. Download from https://imagemagick.org/script/download.php#windows
+2. Install with "Add application directory to system PATH" checked
+3. Restart Lightroom
+
+The script automatically detects ImageMagick in `C:\Program Files\ImageMagick*` even if not in PATH.
+
+### Plugin runs but nothing happens (Windows)
+
+1. **Check for hung Python processes:** Open Task Manager and look for old `python.exe` processes. Kill any that have been running for hours.
+2. **Delete stale progress files:** Delete `.racing_tagger_progress.json` files in image folders to allow reprocessing.
+3. **Restart Lightroom:** The plugin caches Lua code, so restart Lightroom after any plugin updates.
+
+### Lightroom plugin not finding Python script
+
+The plugin looks for Python scripts in the same folder as the `.lrplugin` folder. If you installed the plugin to `%APPDATA%\Adobe\Lightroom\Modules\`, copy all `.py` files there too.
 
 ## Development
 
