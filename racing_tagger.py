@@ -500,6 +500,38 @@ def metadata_to_keywords(metadata: dict, fuzzy_numbers: bool = False) -> list[st
     return keywords
 
 
+def categorize_error(error_str: str) -> str:
+    """Categorize an error for keyword tagging."""
+    error_lower = error_str.lower()
+    if 'ggml' in error_lower or 'assertion' in error_lower:
+        return 'ModelCrash'
+    elif 'http 500' in error_lower or 'inference failed' in error_lower:
+        return 'InferenceFailed'
+    elif 'timeout' in error_lower or 'timed out' in error_lower:
+        return 'Timeout'
+    elif 'json' in error_lower or 'parse' in error_lower:
+        return 'ParseError'
+    elif 'connection' in error_lower or 'connect' in error_lower:
+        return 'ConnectionError'
+    else:
+        return 'Unknown'
+
+
+def write_error_keyword(image_path: Path, error_str: str, output_dir: Path, dry_run: bool) -> None:
+    """Write an error keyword to mark a file as processed but failed."""
+    if dry_run:
+        return
+
+    try:
+        error_type = categorize_error(error_str)
+        error_keyword = f"Error:{error_type}"
+        target_path = get_target_path(image_path, output_dir)
+        write_xmp_keywords(target_path, [error_keyword], source_image=image_path, merge=True)
+        logger.debug(f"Wrote error keyword '{error_keyword}' to {image_path.name}")
+    except Exception as e:
+        logger.warning(f"Failed to write error keyword to {image_path.name}: {e}")
+
+
 def process_single_image(
     image_path: Path,
     inference: LlamaVisionInference,
@@ -560,6 +592,8 @@ def process_single_image(
     except Exception as e:
         result['error'] = str(e)
         logger.error(f"Error processing {image_path.name}: {e}")
+        # Write error keyword so file is marked as attempted
+        write_error_keyword(image_path, str(e), output_dir, dry_run)
 
     return result
 
@@ -622,6 +656,8 @@ def process_with_encoded_image(
     except Exception as e:
         result['error'] = str(e)
         logger.error(f"Error processing {image_path.name}: {e}")
+        # Write error keyword so file is marked as attempted
+        write_error_keyword(image_path, str(e), output_dir, dry_run)
 
     return result
 
