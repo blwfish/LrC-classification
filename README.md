@@ -27,9 +27,10 @@ Automatically extract metadata from racing photography using local vision AI and
 - 16GB+ RAM recommended
 
 **Windows 11:**
-- NVIDIA GPU with 8GB+ VRAM for CUDA acceleration
-- ImageMagick 7.x (install with "Add to PATH" option)
-- Or CPU-only (slower, ~30-60 sec/image)
+- NVIDIA GPU with 8GB+ VRAM for CUDA acceleration (16GB+ recommended)
+- ImageMagick 7.x (install with "Add to PATH" option) - **Required for optimal performance**
+- Modern CPUs (Ryzen 9 or Intel i9) recommended
+- 32GB+ RAM recommended (128GB ideal for large batches)
 - See [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for detailed installation guide
 
 ## Installation
@@ -252,12 +253,14 @@ After importing XMP sidecars, search in Lightroom using:
 | qwen2.5vl:32b | 21GB | ~15.5s/img | ~24GB | No quality improvement over 7b |
 | qwen2.5vl:72b | 48GB | ~31s/img | ~51GB | Slower, different but not better results |
 
-**Windows (Ryzen 9 5950X + RTX 3060, CUDA acceleration):**
+**Windows (Ryzen 9 9950X + RTX 5070 Ti, CUDA acceleration):**
 
 | Model | Size | Speed | Recommendation |
 |-------|------|-------|----------------|
-| qwen2.5vl:7b | 6GB | ~5-7s/img | **Best choice** with ImageMagick resizing |
-| qwen2.5vl:7b | 6GB | ~25s/img | Without ImageMagick (full-res images) |
+| qwen2.5vl:7b | 6GB | ~11.5s/img | **Best choice** - batch processing average with ImageMagick |
+| qwen2.5vl:7b | 6GB | ~25s+/img | Without ImageMagick (full-res images, not recommended) |
+
+**Note:** RTX 5070 Ti has 16GB VRAM, allowing headroom for larger models if desired. Older hardware (RTX 3060/3070) will be slower but still functional.
 
 **Note:** First image after model load incurs a cold-start penalty (~6s for 7b, ~17s for 32b, ~50s for 72b). Subsequent images benefit from model caching via `keep_alive: 30m`.
 
@@ -271,13 +274,17 @@ After importing XMP sidecars, search in Lightroom using:
 | 1,000 images | ~1.5 hours |
 | 10,000 images | ~15 hours |
 
-**Windows/CUDA (qwen2.5vl:7b, Ryzen 9 5950X + RTX 3060 with ImageMagick):**
+**Windows/CUDA (qwen2.5vl:7b, Ryzen 9 9950X + RTX 5070 Ti with ImageMagick):**
 
 | Dataset Size | Time |
 |--------------|------|
-| 100 images | ~10-12 min |
-| 1,000 images | ~1.5-2 hours |
-| 10,000 images | ~15-20 hours |
+| 100 images | ~19 min |
+| 500 images | ~1.6 hours |
+| 1,000 images | ~3.2 hours |
+| 5,000 images | ~16 hours |
+| 10,000 images | ~32 hours |
+
+Based on real-world batch processing average of 11.5s/image (includes model load, I/O, and XMP writing).
 
 Run in background with `--resume` for interruption tolerance.
 
