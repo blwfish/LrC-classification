@@ -1,12 +1,39 @@
 # Racing Tagger - Session Checkpoint
 
-**Date:** 2024-12-18
+**Date:** 2026-01-03
 
 ## Current Status
 
-**Production Ready** - Successfully tested on 7,509 images with 99.97% success rate.
+**Production Ready** - Successfully running in production with RTX 5070 Ti achieving 11.5s/image average.
 
-## Recent Changes (2024-12-18)
+## Recent Changes (2026-01-03)
+
+### 1. Windows Stability Improvements
+- **ImageMagick Detection:** Added automatic detection in `C:\Program Files\ImageMagick*` for Windows
+- **Image Resizing:** Reduced NORMALIZE_SIZE from 2500px to 1500px to prevent GGML assertion failures
+- **Command Execution Fix:** Fixed Lightroom plugin Windows command execution using temp batch files
+- **Performance:** Improved from ~25s/image to ~11.5s/image on RTX 5070 Ti
+- **Files:** `llama_inference.py`, `RacingTagger.lrplugin/Config.lua`
+
+### 2. Error Keyword Writing
+- **New Feature:** Failed images now get error keywords written to XMP
+- **Error Categories:**
+  - `Error:ModelCrash` - GGML assertion failures
+  - `Error:InferenceFailed` - HTTP 500 errors
+  - `Error:Timeout` - Request timeouts
+  - `Error:ParseError` - JSON parsing failures
+  - `Error:ConnectionError` - Ollama connection issues
+  - `Error:Unknown` - Other errors
+- **Benefit:** Easy filtering in Lightroom to identify and retry problematic images
+- **Files:** `racing_tagger.py`
+
+### 3. Updated Benchmarks
+- **Hardware:** Ryzen 9 9950X + RTX 5070 Ti (16GB VRAM) + 128GB RAM
+- **Performance:** 11.5s/image average in batch processing
+- **Comparison:** Only ~2x slower than M4 Max (5.5s/image)
+- **Files:** `README.md`
+
+## Previous Session (2024-12-18)
 
 ### 1. Improved False Positive Detection
 - **Issue:** Paddock scenes with tiny/partial cars were getting hallucinated tags (e.g., pit crew photo with car sliver at edge → "Porsche 911 #202")
@@ -98,14 +125,25 @@ python3 racing_tagger.py /path/to/images --resume --verbose
 python3 racing_tagger.py /path/to/image.NEF --model qwen2.5vl:72b --dry-run --verbose
 ```
 
-## Performance (M4 Max)
+## Performance
 
+### M4 Max (macOS, Metal)
 | Metric | Value |
 |--------|-------|
 | Model | qwen2.5vl:7b (6GB) |
-| Speed | ~5-6 sec/image |
+| Speed | ~5.5 sec/image |
 | GPU | ~85% Metal |
 | Memory | ~8GB during inference |
+
+### RTX 5070 Ti (Windows, CUDA)
+| Metric | Value |
+|--------|-------|
+| Model | qwen2.5vl:7b (6GB) |
+| Speed | ~11.5 sec/image (batch average) |
+| GPU | 16GB VRAM, 100% loaded |
+| CPU | Ryzen 9 9950X (16-core) |
+| Memory | 128GB RAM |
+| ImageMagick | Required - resizes to 1500px |
 
 ## Known Limitations
 
