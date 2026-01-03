@@ -2,6 +2,46 @@
 
 All notable changes to the Racing Tagger project will be documented in this file.
 
+## [1.3.0] - 2026-01-03
+
+### Added
+- **Error Keyword Writing**: Failed images now get error keywords written to XMP
+  - `Error:ModelCrash` - GGML assertion failures
+  - `Error:InferenceFailed` - HTTP 500 errors from model
+  - `Error:Timeout` - Request timeouts
+  - `Error:ParseError` - JSON parsing failures
+  - `Error:ConnectionError` - Ollama connection issues
+  - `Error:Unknown` - Other unclassified errors
+  - Enables filtering failed images in Lightroom for retry or investigation
+
+### Fixed
+- **Windows ImageMagick Detection**: Automatically detects ImageMagick in `C:\Program Files\ImageMagick*` even if not in PATH
+- **Windows Command Execution**: Fixed Lightroom plugin execution using temp batch files instead of direct command strings
+- **GGML Assertion Failures**: Reduced NORMALIZE_SIZE from 2500px to 1500px to prevent model crashes on large images
+- **Windows convert.exe Conflict**: Only uses `magick.exe` on Windows to avoid conflict with Windows disk utility
+
+### Changed
+- **Image Processing**: All images now resized to 1500px max dimension before inference (down from 2500px)
+  - Reduces VRAM usage and prevents crashes
+  - Improves processing speed from ~25s to ~11.5s per image on RTX 5070 Ti
+  - ImageMagick now required (previously recommended)
+
+### Performance
+- **Windows (RTX 5070 Ti)**: Updated benchmarks based on real-world testing
+  - Hardware: Ryzen 9 9950X + RTX 5070 Ti (16GB VRAM) + 128GB RAM
+  - Speed: 11.5s/image average in batch processing
+  - Only ~2x slower than M4 Max despite being CUDA vs Metal-optimized model
+  - 100 images: ~19 min
+  - 1,000 images: ~3.2 hours
+  - 10,000 images: ~32 hours
+
+### Documentation
+- Updated README with modern Windows hardware specs
+- Added troubleshooting sections for GGML errors and hung processes
+- Clarified ImageMagick requirement for Windows
+
+---
+
 ## [1.2.0] - 2025-12-23
 
 ### Fixed
