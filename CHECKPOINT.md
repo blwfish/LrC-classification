@@ -27,7 +27,16 @@
 - **Benefit:** Easy filtering in Lightroom to identify and retry problematic images
 - **Files:** `racing_tagger.py`
 
-### 3. Updated Benchmarks
+### 3. Keyword Cleanup Utility
+- **New Tool:** `cleanup_old_keywords.py` - One-time migration utility
+- **Purpose:** Remove old flat keywords (e.g., `Make:Porsche`, `Num:73`) after migrating to hierarchical structure
+- **Preserves:**
+  - New hierarchical keywords (`AI Keywords|Make|Porsche`)
+  - Manual keywords (track names, customer info, event names)
+- **Features:** Dry-run mode, timestamped logging, reads/removes from both Subject and HierarchicalSubject
+- **Files:** `cleanup_old_keywords.py` (new), `README.md`, `CHANGELOG.md`
+
+### 4. Updated Benchmarks
 - **Hardware:** Ryzen 9 9950X + RTX 5070 Ti (16GB VRAM) + 128GB RAM
 - **Performance:** 11.5s/image average in batch processing
 - **Comparison:** Only ~2x slower than M4 Max (5.5s/image)
@@ -72,6 +81,7 @@
 ```
 racing-tagger/
 ├── racing_tagger.py        # Main CLI tool
+├── cleanup_old_keywords.py # Keyword cleanup utility (one-time migration)
 ├── llama_inference.py      # Ollama vision model integration
 ├── xmp_writer.py           # XMP sidecar writing via exiftool
 ├── prompts.py              # Vision prompts by profile
