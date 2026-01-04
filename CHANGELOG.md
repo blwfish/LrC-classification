@@ -13,6 +13,13 @@ All notable changes to the Racing Tagger project will be documented in this file
   - `Error:ConnectionError` - Ollama connection issues
   - `Error:Unknown` - Other unclassified errors
   - Enables filtering failed images in Lightroom for retry or investigation
+- **Keyword Cleanup Utility**: New `cleanup_old_keywords.py` tool for one-time migration from flat to hierarchical keywords
+  - Removes only old flat auto-generated keywords (e.g., `Make:Porsche`, `Model:911GT3Cup`, `Num:73`)
+  - Preserves new hierarchical keywords (e.g., `AI Keywords|Make|Porsche`)
+  - Preserves manual keywords (track names, customer info, event names)
+  - Dry-run mode to preview changes before execution
+  - Timestamped log files for audit trail
+  - Reads and removes from both Subject and HierarchicalSubject XMP fields
 
 ### Fixed
 - **Windows ImageMagick Detection**: Automatically detects ImageMagick in `C:\Program Files\ImageMagick*` even if not in PATH

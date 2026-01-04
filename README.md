@@ -234,6 +234,51 @@ After importing XMP sidecars, search in Lightroom using:
 - `Color:Blue` - Blue cars
 - Or browse the hierarchical tree in the Keyword List panel
 
+## Keyword Cleanup Utility
+
+If you previously ran Racing Tagger with the old flat keyword format (e.g., `Make:Porsche`, `Model:911GT3Cup`) and have since migrated to the hierarchical keyword structure (e.g., `AI Keywords|Make|Porsche`), you can use the cleanup utility to remove old flat keywords while preserving the new hierarchical keywords and any manual keywords.
+
+### Usage
+
+```bash
+# Dry run to preview what would be removed
+python3 cleanup_old_keywords.py /path/to/images --dry-run
+
+# Clean up a specific directory
+python3 cleanup_old_keywords.py /path/to/images
+
+# Clean up a single file
+python3 cleanup_old_keywords.py /path/to/image.xmp
+
+# Verbose output showing preserved keywords
+python3 cleanup_old_keywords.py /path/to/images --verbose
+```
+
+### What Gets Removed
+
+The cleanup tool removes **only** old flat auto-generated keywords:
+- `Make:Porsche`, `Model:911GT3Cup`, `Color:Blue`, `Color:Black`
+- `Num:73`, `Class:SPB`, `Engine:Flat6`
+- `Error:*`, `Sequence:*`, `People:*`, `Subcategory:*`
+- `Classified`, `NoSubject`
+
+### What Gets Preserved
+
+The cleanup tool **preserves**:
+- **New hierarchical keywords**: `AI Keywords|Make|Porsche`, `AI Keywords|Model|911GT3`, etc.
+- **Manual keywords**: Track names, customer info, event names, etc.
+
+### Logging
+
+Each run creates a timestamped log file (e.g., `cleanup_keywords_20260103_191652.log`) with detailed information about which keywords were removed from each file.
+
+### Safety
+
+- Always use `--dry-run` first to preview changes
+- The tool reads from both `Subject` and `HierarchicalSubject` XMP fields
+- Keywords are removed from both fields to ensure complete cleanup
+- No backups are created (exiftool's `-overwrite_original` flag is used)
+
 ## How It Works
 
 1. **Image Analysis**: Each image is sent to a local vision model (qwen2.5vl recommended)
@@ -342,6 +387,7 @@ The plugin looks for Python scripts in the same folder as the `.lrplugin` folder
 ```
 racing-tagger/
 ├── racing_tagger.py        # Main CLI tool
+├── cleanup_old_keywords.py # Keyword cleanup utility
 ├── llama_inference.py      # Ollama/llama.cpp integration
 ├── xmp_writer.py           # XMP sidecar writing (via exiftool)
 ├── prompts.py              # Vision prompts by profile
