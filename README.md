@@ -11,6 +11,9 @@ Automatically extract metadata from racing photography using local vision AI and
 - **Cross-platform** - Works on macOS and Windows 11
 - **Resumable** - Track progress and resume interrupted runs
 - **Hardware accelerated** - Uses Metal (Mac) or CUDA (NVIDIA) when available
+- **Automatic permission handling** - Fixes read-only files on NAS/network drives automatically
+- **Smart duplicate prevention** - Removes old AI Keywords when re-tagging to prevent duplicates
+- **Self-healing** - Automatically cleans up stale temp files that block writes
 
 ## Requirements
 
@@ -375,6 +378,24 @@ The script automatically detects ImageMagick in `C:\Program Files\ImageMagick*` 
 1. **Check for hung Python processes:** Open Task Manager and look for old `python.exe` processes. Kill any that have been running for hours.
 2. **Delete stale progress files:** Delete `.racing_tagger_progress.json` files in image folders to allow reprocessing.
 3. **Restart Lightroom:** The plugin caches Lua code, so restart Lightroom after any plugin updates.
+
+**Note:** As of v1.3.1, stale `_exiftool_tmp` files and read-only permissions are automatically cleaned up, eliminating the most common write failures.
+
+### Duplicate AI Keywords in Lightroom
+
+If you're seeing duplicate AI Keywords (e.g., multiple `AI Keywords|Make|Porsche` entries), you likely ran an older version (pre-1.3.1) multiple times on the same files. This has been fixed:
+
+- **v1.3.1+:** Automatically removes old AI Keywords before adding new ones
+- **Re-tag files:** Simply run the tagger again on files with duplicates - they will be cleaned automatically
+- **Old files:** The duplicate prevention works retroactively on files tagged with older versions
+
+### Read-only files on NAS/network drives
+
+Files stored on network drives are often set to read-only, which prevents metadata writes. As of v1.3.1, this is handled automatically:
+
+- The tagger detects read-only files and makes them writable
+- Changes are logged (e.g., `INFO - Fixed read-only permissions on: filename.jpg`)
+- No manual `chmod` or permission changes needed
 
 ### Lightroom plugin not finding Python script
 

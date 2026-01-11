@@ -2,6 +2,39 @@
 
 All notable changes to the Racing Tagger project will be documented in this file.
 
+## [1.3.1] - 2026-01-11
+
+### Fixed
+- **Duplicate AI Keywords**: Fixed critical bug where running tagger multiple times on the same file created duplicate AI Keywords entries
+  - Now removes existing AI Keywords before adding new ones during merge operations
+  - Prevents accumulation of duplicate hierarchical keyword paths
+  - Tested with files tagged 6+ times showing clean single keyword sets
+- **Read-Only File Handling**: Automatic detection and fixing of read-only file permissions
+  - Files on NAS/network drives often set to read-only, blocking metadata writes
+  - Automatically makes files writable when needed
+  - Logs permission changes for visibility
+- **Stale Temp File Cleanup**: Automatic cleanup of leftover `_exiftool_tmp` files
+  - These temp files block writes with "Temporary file already exists" errors
+  - Created when exiftool operations are interrupted (crash, Ctrl+C, permissions error)
+  - Now automatically detected and removed before write operations
+- **XMP Metadata Precision**: Changed keyword operations to use specific `XMP-dc:Subject` field
+  - Prevents cross-contamination with IPTC and other metadata groups
+  - Ensures clean, predictable keyword management
+
+### Changed
+- **Permission Handling**: All write operations now check and fix file permissions automatically
+  - No user intervention required for read-only files
+  - Clear logging when files are modified
+- **Error Prevention**: Proactive cleanup prevents common write failures before they occur
+
+### Technical Details
+- Added `cleanup_exiftool_temp_files()` function in `xmp_writer.py`
+- Added `ensure_writable()` function in `xmp_writer.py`
+- Modified `write_xmp_keywords()` to remove existing AI Keywords in merge mode
+- Modified `read_existing_keywords()` to read from `XMP-dc:Subject` specifically
+
+---
+
 ## [1.3.0] - 2026-01-03
 
 ### Added
