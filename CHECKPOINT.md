@@ -1,12 +1,47 @@
 # Racing Tagger - Session Checkpoint
 
-**Date:** 2026-01-03
+**Date:** 2026-01-11
 
 ## Current Status
 
-**Production Ready** - Successfully running in production with RTX 5070 Ti achieving 11.5s/image average.
+**Production Ready** - Successfully running in production on 20,000+ files with automatic permission handling and duplicate prevention.
 
-## Recent Changes (2026-01-03)
+## Recent Changes (2026-01-11)
+
+### 1. Duplicate AI Keywords Fix
+- **Critical Bug Fixed:** Running tagger multiple times on same file was creating duplicate AI Keywords
+- **Root Cause:** Merge logic was blindly appending keywords without checking for existing AI Keywords
+- **Solution:** Now removes all existing `AI Keywords|*` entries before adding new ones
+- **Retroactive:** Works on files already tagged with older versions - simply re-run to clean up duplicates
+- **Testing:** Verified on files tagged 6+ times, now shows clean single keyword sets
+- **Files:** `xmp_writer.py`
+
+### 2. Automatic Permission Handling
+- **New Feature:** Automatic detection and fixing of read-only file permissions
+- **Problem:** Files on NAS/network drives often set to read-only, blocking metadata writes
+- **Solution:** `ensure_writable()` function automatically makes files writable when needed
+- **Logging:** Clear visibility when permissions are changed
+- **Files:** `xmp_writer.py`
+
+### 3. Stale Temp File Cleanup
+- **New Feature:** Automatic cleanup of leftover `_exiftool_tmp` files
+- **Problem:** Interrupted operations (crash, Ctrl+C, permissions error) leave temp files that block future writes
+- **Error:** `Error: Temporary file already exists: *_exiftool_tmp`
+- **Solution:** `cleanup_exiftool_temp_files()` function detects and removes stale temp files
+- **Files:** `xmp_writer.py`
+
+### 4. XMP Metadata Precision
+- **Improvement:** Changed keyword operations to use specific `XMP-dc:Subject` field
+- **Prevents:** Cross-contamination with IPTC and other metadata groups
+- **Result:** Cleaner, more predictable keyword management
+- **Files:** `xmp_writer.py`
+
+### 5. Documentation Updates
+- **Updated:** CHANGELOG.md (added v1.3.1 entry)
+- **Updated:** README.md (added new features to Features section, new troubleshooting sections)
+- **Updated:** CHECKPOINT.md (this file)
+
+## Previous Session (2026-01-03)
 
 ### 1. Windows Stability Improvements
 - **ImageMagick Detection:** Added automatic detection in `C:\Program Files\ImageMagick*` for Windows

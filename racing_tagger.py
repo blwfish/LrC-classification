@@ -6,7 +6,7 @@ Automatically extracts metadata from racing photography using local vision model
 and writes keywords to XMP sidecars for Lightroom searchability.
 """
 
-__version__ = '1.2.0'
+__version__ = '1.3.1'
 
 import argparse
 import json
