@@ -13,7 +13,9 @@ compatibility with Lightroom's expected metadata structure.
 """
 
 import logging
+import os
 import shutil
+import stat
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -48,6 +50,65 @@ def is_raw_file(path: Path) -> bool:
 def is_embeddable(path: Path) -> bool:
     """Check if a file supports embedded metadata."""
     return path.suffix.lower() in EMBEDDABLE_EXTENSIONS
+
+
+def cleanup_exiftool_temp_files(file_path: Path) -> None:
+    """
+    Clean up stale exiftool temporary files that block writes.
+
+    Exiftool creates *_exiftool_tmp files during operations. If these operations
+    are interrupted (crash, Ctrl+C, permissions error), the temp files remain
+    and block future writes with "Temporary file already exists" errors.
+
+    Args:
+        file_path: Path to the file being processed (we'll look for its temp file)
+    """
+    temp_file = Path(str(file_path) + '_exiftool_tmp')
+
+    if temp_file.exists():
+        try:
+            # Make temp file writable if it's read-only
+            if not os.access(temp_file, os.W_OK):
+                os.chmod(temp_file, stat.S_IWRITE | stat.S_IREAD)
+
+            temp_file.unlink()
+            logger.info(f"Removed stale exiftool temp file: {temp_file.name}")
+        except Exception as e:
+            logger.warning(f"Failed to remove temp file {temp_file.name}: {e}")
+
+
+def ensure_writable(file_path: Path) -> bool:
+    """
+    Ensure a file is writable, fixing permissions if needed.
+
+    On network drives (NAS) and some systems, files may be set to read-only,
+    which prevents exiftool from writing metadata. This function checks
+    if the file is writable and automatically fixes permissions if needed.
+
+    Args:
+        file_path: Path to the file to check/fix
+
+    Returns:
+        True if file is writable (or was made writable), False if we couldn't fix it
+    """
+    if not file_path.exists():
+        # File doesn't exist yet (e.g., XMP sidecar to be created)
+        return True
+
+    # Check if file is writable
+    if os.access(file_path, os.W_OK):
+        return True
+
+    # File is read-only, try to make it writable
+    try:
+        current_mode = file_path.stat().st_mode
+        new_mode = current_mode | stat.S_IWRITE
+        os.chmod(file_path, new_mode)
+        logger.info(f"Fixed read-only permissions on: {file_path.name}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to make file writable {file_path.name}: {e}")
+        return False
 
 
 def get_target_path(image_path: Path, output_dir: Optional[Path] = None) -> Path:
@@ -132,7 +193,7 @@ def read_existing_keywords(file_path: Path) -> list[str]:
 
     try:
         result = subprocess.run(
-            [EXIFTOOL_PATH, '-Subject', '-s', '-s', '-s', str(file_path)],
+            [EXIFTOOL_PATH, '-XMP-dc:Subject', '-s', '-s', '-s', str(file_path)],
             capture_output=True,
             text=True,
             timeout=30
@@ -196,6 +257,14 @@ def write_xmp_keywords(
         return True
 
     try:
+        # Clean up any stale exiftool temp files that would block writes
+        cleanup_exiftool_temp_files(target_path)
+
+        # Ensure target file is writable (fix read-only permissions if needed)
+        if not ensure_writable(target_path):
+            logger.error(f"Cannot write to {target_path} - file is not writable")
+            return False
+
         # Build hierarchical keyword paths for Lightroom
         hierarchical_keywords = build_hierarchical_keywords(keywords)
 
@@ -216,20 +285,29 @@ def write_xmp_keywords(
         # Write hierarchical keywords using pipe-separated paths
         # Lightroom reads Subject field and displays pipe-separated paths as expandable trees
         if merge:
-            # Add hierarchical paths to both Subject and HierarchicalSubject
-            # Subject field: use pipe-separated paths that Lightroom can parse as hierarchy
+            # When merging, remove existing AI Keywords to prevent duplicates, then add new ones
+            # Read existing keywords
+            existing_keywords = read_existing_keywords(target_path)
+
+            # Remove any existing AI Keywords (anything starting with "AI Keywords")
+            ai_keywords_to_remove = [kw for kw in existing_keywords if kw.startswith('AI Keywords')]
+
+            # Use exiftool's remove syntax to delete existing AI Keywords
+            for kw in ai_keywords_to_remove:
+                cmd.append(f'-XMP-dc:Subject-={kw}')
+                cmd.append(f'-XMP-lr:HierarchicalSubject-={kw}')
+
+            # Add new AI Keywords
             for path in hierarchical_keywords.split(', '):
-                cmd.append(f'-Subject+={path}')
-            # HierarchicalSubject field: for compatibility with other apps
-            for path in hierarchical_keywords.split(', '):
+                cmd.append(f'-XMP-dc:Subject+={path}')
                 cmd.append(f'-XMP-lr:HierarchicalSubject+={path}')
         else:
             # Replace all keywords with hierarchical structure
             # Clear old Subject keywords first
-            cmd.append('-Subject=')
+            cmd.append('-XMP-dc:Subject=')
             # Write new hierarchical keywords to Subject with pipe separators
             for path in hierarchical_keywords.split(', '):
-                cmd.append(f'-Subject+={path}')
+                cmd.append(f'-XMP-dc:Subject+={path}')
             # Also write to HierarchicalSubject for compatibility
             for path in hierarchical_keywords.split(', '):
                 cmd.append(f'-XMP-lr:HierarchicalSubject+={path}')
