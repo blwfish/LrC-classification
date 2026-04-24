@@ -35,3 +35,9 @@ Thumbs.db
 test_run.log
 benchmark.log
 run.out
+
+# Local scaffolding (not tracked in repo)
+CLAUDE.md
+CLAUDE_CONTEXT.md
+.claude/
+.claude.json
